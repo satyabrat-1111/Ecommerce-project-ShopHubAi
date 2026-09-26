@@ -8,6 +8,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 from products.models import Product
 from .models import UserProductInteraction
+from .services.user_profile import get_user_preference_profile
 
 
 # ============================================================
@@ -19,8 +20,14 @@ BRAND_WEIGHT = 0.20
 DESCRIPTION_WEIGHT = 0.30
 PRICE_WEIGHT = 0.15
 
-CONTENT_SCORE_WEIGHT = 0.70
-USER_PREFERENCE_WEIGHT = 0.30
+# Existing content score
+CONTENT_SCORE_WEIGHT = 0.55
+
+# Existing interaction-based personalization
+USER_PREFERENCE_WEIGHT = 0.20
+
+# New behavioral user profile personalization
+USER_PROFILE_WEIGHT = 0.25
 
 
 # ============================================================
@@ -29,7 +36,8 @@ USER_PREFERENCE_WEIGHT = 0.30
 
 RECOMMENDATION_CACHE_TIMEOUT = 600
 
-CACHE_KEY_PREFIX = "shophub_ai:recommendations"
+# v2 because recommendation scoring logic has changed
+CACHE_KEY_PREFIX = "shophub_ai:recommendations:v2"
 
 
 # ============================================================
@@ -65,7 +73,7 @@ EXCLUDED_INTERACTION_TYPES = [
 #
 # Wishlist/cart products can become candidates if
 # there are not enough fresh recommendations.
-#
+
 RELAXED_EXCLUDED_INTERACTION_TYPES = [
     "purchase",
 ]
@@ -85,11 +93,11 @@ def get_recommendation_cache_key(
 
     Guest:
 
-        shophub_ai:recommendations:guest:product:2:limit:5
+        shophub_ai:recommendations:v2:guest:product:2:limit:5
 
     Authenticated:
 
-        shophub_ai:recommendations:user:5:product:2:limit:5
+        shophub_ai:recommendations:v2:user:5:product:2:limit:5
     """
 
     if (
@@ -646,6 +654,9 @@ def get_user_preference_score(
 ):
     """
     Calculate personalized preference score.
+
+    This is the existing interaction-based
+    personalization layer.
     """
 
     if (
@@ -723,6 +734,222 @@ def get_user_preference_score(
 
 
 # ============================================================
+# USER PROFILE PREFERENCE SCORE
+# ============================================================
+
+def get_user_profile_preference_score(
+    candidate_product,
+    user,
+    user_profile=None
+):
+    """
+    Calculate recommendation score using
+    the user's behavioral preference profile.
+
+    Profile signals:
+
+        Category affinity
+        Brand affinity
+        Price preference
+
+    The profile itself already considers:
+
+        Interaction type
+        Interaction intensity
+        Interaction recency
+
+    Final profile score:
+
+        Category = 40%
+        Brand    = 35%
+        Price    = 25%
+    """
+
+    if (
+        not user
+        or not user.is_authenticated
+    ):
+        return 0.0
+
+    # --------------------------------------------------------
+    # Use supplied profile when available.
+    #
+    # This is important because the main recommendation
+    # pipeline calculates the profile only once.
+    # --------------------------------------------------------
+
+    if user_profile is None:
+
+        user_profile = (
+            get_user_preference_profile(
+                user
+            )
+        )
+
+    # --------------------------------------------------------
+    # Cold-start user
+    # --------------------------------------------------------
+
+    if user_profile.get(
+        "is_cold_start",
+        True
+    ):
+        return 0.0
+
+    # ========================================================
+    # CATEGORY AFFINITY
+    # ========================================================
+
+    category_score = 0.0
+
+    for item in user_profile.get(
+        "category_affinity",
+        []
+    ):
+
+        if (
+            item.get("category_id")
+            ==
+            candidate_product.category_id
+        ):
+
+            category_score = float(
+                item.get(
+                    "score",
+                    0.0
+                )
+            )
+
+            break
+
+    # ========================================================
+    # BRAND AFFINITY
+    # ========================================================
+
+    brand_score = 0.0
+
+    candidate_brand = (
+        (candidate_product.brand or "")
+        .strip()
+        .lower()
+    )
+
+    if candidate_brand:
+
+        for item in user_profile.get(
+            "brand_affinity",
+            []
+        ):
+
+            profile_brand = (
+                (item.get("brand") or "")
+                .strip()
+                .lower()
+            )
+
+            if (
+                profile_brand
+                ==
+                candidate_brand
+            ):
+
+                brand_score = float(
+                    item.get(
+                        "score",
+                        0.0
+                    )
+                )
+
+                break
+
+    # ========================================================
+    # PRICE AFFINITY
+    # ========================================================
+
+    price_score = 0.0
+
+    price_preference = (
+        user_profile.get(
+            "price_preference",
+            {}
+        )
+    )
+
+    average_price = (
+        price_preference.get(
+            "average"
+        )
+    )
+
+    candidate_price = float(
+        get_product_price(
+            candidate_product
+        )
+    )
+
+    if (
+        average_price is not None
+        and candidate_price > 0
+        and float(average_price) > 0
+    ):
+
+        price_difference = abs(
+            candidate_price
+            -
+            float(average_price)
+        )
+
+        price_average = (
+            candidate_price
+            +
+            float(average_price)
+        ) / 2
+
+        if price_average > 0:
+
+            price_score = (
+                1.0
+                -
+                (
+                    price_difference
+                    /
+                    price_average
+                )
+            )
+
+            price_score = max(
+                0.0,
+                min(
+                    1.0,
+                    price_score
+                )
+            )
+
+    # ========================================================
+    # FINAL PROFILE SCORE
+    # ========================================================
+
+    profile_score = (
+        category_score * 0.40
+        +
+        brand_score * 0.35
+        +
+        price_score * 0.25
+    )
+
+    return round(
+        max(
+            0.0,
+            min(
+                1.0,
+                profile_score
+            )
+        ),
+        4
+    )
+
+
+# ============================================================
 # PERSONALIZED SCORE
 # ============================================================
 
@@ -730,20 +957,26 @@ def calculate_personalized_score(
     target_product,
     candidate_product,
     user=None,
-    aggregated_interactions=None
+    aggregated_interactions=None,
+    user_profile=None
 ):
     """
     Calculate final personalized score.
 
     Guest / cold-start:
 
-        Content score only.
+        100% Content
 
     Existing user:
 
-        70% Content
-        30% User Preference
+        55% Content
+        20% Existing User Preference
+        25% Behavioral User Profile
     """
+
+    # ========================================================
+    # CONTENT SCORE
+    # ========================================================
 
     content_score = (
         calculate_content_score(
@@ -752,9 +985,9 @@ def calculate_personalized_score(
         )
     )
 
-    # --------------------------------------------------------
+    # ========================================================
     # GUEST
-    # --------------------------------------------------------
+    # ========================================================
 
     if (
         not user
@@ -766,9 +999,9 @@ def calculate_personalized_score(
             4
         )
 
-    # --------------------------------------------------------
-    # AGGREGATION
-    # --------------------------------------------------------
+    # ========================================================
+    # AGGREGATED INTERACTIONS
+    # ========================================================
 
     if aggregated_interactions is None:
 
@@ -778,9 +1011,9 @@ def calculate_personalized_score(
             )
         )
 
-    # --------------------------------------------------------
+    # ========================================================
     # COLD START
-    # --------------------------------------------------------
+    # ========================================================
 
     if not aggregated_interactions:
 
@@ -789,9 +1022,9 @@ def calculate_personalized_score(
             4
         )
 
-    # --------------------------------------------------------
-    # USER PREFERENCE
-    # --------------------------------------------------------
+    # ========================================================
+    # EXISTING USER PREFERENCE
+    # ========================================================
 
     user_preference_score = (
         get_user_preference_score(
@@ -805,18 +1038,42 @@ def calculate_personalized_score(
         )
     )
 
-    # --------------------------------------------------------
+    # ========================================================
+    # NEW USER PROFILE SCORE
+    # ========================================================
+
+    user_profile_score = (
+        get_user_profile_preference_score(
+            candidate_product=
+                candidate_product,
+
+            user=user,
+
+            user_profile=
+                user_profile
+        )
+    )
+
+    # ========================================================
     # FINAL SCORE
-    # --------------------------------------------------------
+    # ========================================================
 
     final_score = (
         content_score
         *
         CONTENT_SCORE_WEIGHT
+
         +
+
         user_preference_score
         *
         USER_PREFERENCE_WEIGHT
+
+        +
+
+        user_profile_score
+        *
+        USER_PROFILE_WEIGHT
     )
 
     return round(
@@ -839,10 +1096,16 @@ def get_recommendation_reasons(
     target_product,
     candidate_product,
     user=None,
-    aggregated_interactions=None
+    aggregated_interactions=None,
+    user_profile=None,
 ):
     """
-    Explain why a candidate was recommended.
+    Explain why a candidate product was recommended.
+
+    Reasons are generated from:
+    1. Product similarity
+    2. Previous user interactions
+    3. User preference profile
     """
 
     reasons = []
@@ -898,7 +1161,7 @@ def get_recommendation_reasons(
         )
 
     # ========================================================
-    # TEXT
+    # TEXT / FEATURES
     # ========================================================
 
     if text_score >= 0.20:
@@ -908,13 +1171,17 @@ def get_recommendation_reasons(
         )
 
     # ========================================================
-    # PERSONALIZATION
+    # USER PERSONALIZATION
     # ========================================================
 
     if (
         user
         and user.is_authenticated
     ):
+
+        # ----------------------------------------------------
+        # Existing aggregated interaction preference
+        # ----------------------------------------------------
 
         if aggregated_interactions is None:
 
@@ -943,6 +1210,10 @@ def get_recommendation_reasons(
                 reasons.append(
                     "Matches your previous product interactions"
                 )
+
+            # ------------------------------------------------
+            # Find strongest previous interaction
+            # ------------------------------------------------
 
             strongest_interaction = None
             strongest_weighted_similarity = 0.0
@@ -1041,6 +1312,196 @@ def get_recommendation_reasons(
                         "Related to products you viewed"
                     )
 
+        # ----------------------------------------------------
+        # NEW USER PROFILE EXPLAINABILITY
+        # ----------------------------------------------------
+
+        if user_profile is None:
+
+            user_profile = (
+                get_user_preference_profile(
+                    user
+                )
+            )
+
+        if user_profile and not user_profile.get(
+            "is_cold_start",
+            True
+        ):
+
+            # -----------------------------------------------
+            # Preferred category
+            # -----------------------------------------------
+
+            category_affinity = (
+                user_profile.get(
+                    "category_affinity",
+                    []
+                )
+            )
+
+            candidate_category_id = (
+                getattr(
+                    candidate_product,
+                    "category_id",
+                    None
+                )
+            )
+
+            for category_data in category_affinity:
+
+                if (
+                    category_data.get(
+                        "category_id"
+                    )
+                    ==
+                    candidate_category_id
+                    and
+                    category_data.get(
+                        "score",
+                        0
+                    )
+                    >= 0.40
+                ):
+
+                    reasons.append(
+                        "Matches your preferred category"
+                    )
+
+                    break
+
+            # -----------------------------------------------
+            # Preferred brand
+            # -----------------------------------------------
+
+            brand_affinity = (
+                user_profile.get(
+                    "brand_affinity",
+                    []
+                )
+            )
+
+            candidate_brand = (
+                getattr(
+                    candidate_product,
+                    "brand",
+                    ""
+                )
+                or ""
+            ).strip().lower()
+
+            for brand_data in brand_affinity:
+
+                preferred_brand = (
+                    brand_data.get(
+                        "brand",
+                        ""
+                    )
+                    or ""
+                ).strip().lower()
+
+                if (
+                    candidate_brand
+                    and
+                    candidate_brand == preferred_brand
+                    and
+                    brand_data.get(
+                        "score",
+                        0
+                    )
+                    >= 0.40
+                ):
+
+                    reasons.append(
+                        "Matches a brand you frequently interact with"
+                    )
+
+                    break
+
+            # -----------------------------------------------
+            # Preferred price range
+            # -----------------------------------------------
+
+            price_preference = (
+                user_profile.get(
+                    "price_preference",
+                    {}
+                )
+            )
+
+            average_price = (
+                price_preference.get(
+                    "average"
+                )
+            )
+
+            candidate_price = (
+                candidate_product.discount_price
+                if candidate_product.discount_price
+                is not None
+                else candidate_product.price
+            )
+
+            if (
+                average_price is not None
+                and candidate_price is not None
+            ):
+
+                try:
+
+                    candidate_price_float = float(
+                        candidate_price
+                    )
+
+                    average_price_float = float(
+                        average_price
+                    )
+
+                    denominator = (
+                        candidate_price_float
+                        +
+                        average_price_float
+                    ) / 2
+
+                    if denominator > 0:
+
+                        profile_price_similarity = (
+                            1
+                            -
+                            abs(
+                                candidate_price_float
+                                -
+                                average_price_float
+                            )
+                            /
+                            denominator
+                        )
+
+                        profile_price_similarity = max(
+                            0.0,
+                            min(
+                                1.0,
+                                profile_price_similarity
+                            )
+                        )
+
+                        if (
+                            profile_price_similarity
+                            >= 0.70
+                        ):
+
+                            reasons.append(
+                                "Price is close to your preferred range"
+                            )
+
+                except (
+                    TypeError,
+                    ValueError,
+                    ZeroDivisionError,
+                ):
+
+                    pass
+
     # ========================================================
     # FALLBACK REASON
     # ========================================================
@@ -1051,7 +1512,12 @@ def get_recommendation_reasons(
             "Recommended based on product similarity"
         )
 
+    # Keep response concise.
     reasons = reasons[:4]
+
+    # ========================================================
+    # RETURN EXPLANATION
+    # ========================================================
 
     return {
         "reasons":
@@ -1084,8 +1550,6 @@ def get_recommendation_reasons(
                 ),
         },
     }
-
-
 # ============================================================
 # TRENDING PRODUCTS
 # ============================================================
@@ -1216,9 +1680,9 @@ def get_relevant_candidates(
         target_product.id
     }
 
-    # --------------------------------------------------------
+    # ========================================================
     # USER EXCLUSIONS
-    # --------------------------------------------------------
+    # ========================================================
 
     if (
         user
@@ -1233,9 +1697,9 @@ def get_relevant_candidates(
             )
         )
 
-    # --------------------------------------------------------
+    # ========================================================
     # BASE QUERYSET
-    # --------------------------------------------------------
+    # ========================================================
 
     base_queryset = (
         Product.objects
@@ -1386,10 +1850,14 @@ def score_candidate_products(
     target_product,
     candidates,
     user=None,
-    aggregated_interactions=None
+    aggregated_interactions=None,
+    user_profile=None
 ):
     """
     Score and rank candidate products.
+
+    user_profile is passed into every scoring call
+    so the profile is NOT recalculated for every candidate.
     """
 
     scored_products = []
@@ -1407,7 +1875,10 @@ def score_candidate_products(
                 user=user,
 
                 aggregated_interactions=
-                    aggregated_interactions
+                    aggregated_interactions,
+
+                user_profile=
+                    user_profile
             )
         )
 
@@ -1450,6 +1921,8 @@ def get_recommendations(
         Cache
           ↓
         Target Product
+          ↓
+        User Profile
           ↓
         Strict Candidates
           ↓
@@ -1523,6 +1996,23 @@ def get_recommendations(
         )
 
     # ========================================================
+    # USER PREFERENCE PROFILE
+    # ========================================================
+
+    user_profile = None
+
+    if (
+        user
+        and user.is_authenticated
+    ):
+
+        user_profile = (
+            get_user_preference_profile(
+                user
+            )
+        )
+
+    # ========================================================
     # LEVEL 1: STRICT CANDIDATES
     # ========================================================
 
@@ -1555,7 +2045,10 @@ def get_recommendations(
             user=user,
 
             aggregated_interactions=
-                aggregated_interactions
+                aggregated_interactions,
+
+            user_profile=
+                user_profile
         )
     )
 
@@ -1614,7 +2107,10 @@ def get_recommendations(
                 user=user,
 
                 aggregated_interactions=
-                    aggregated_interactions
+                    aggregated_interactions,
+
+                user_profile=
+                    user_profile
             )
         )
 

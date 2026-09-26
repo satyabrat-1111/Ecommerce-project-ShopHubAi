@@ -149,7 +149,34 @@ class ProductRecommendationView(APIView):
 
         recommendation_data = []
 
-        for recommended_product in recommendations:
+        for recommendation in recommendations:
+
+            # =================================================
+            # IMPORTANT:
+            #
+            # Recommendation engine returns:
+            #
+            # {
+            #     "product": Product object,
+            #     "score": float
+            # }
+            # =================================================
+
+            recommended_product = recommendation.get(
+                "product"
+            )
+
+            recommendation_score = recommendation.get(
+                "score",
+                0.0
+            )
+
+            if not recommended_product:
+                continue
+
+            # ------------------------------------------------
+            # PRODUCT SERIALIZATION
+            # ------------------------------------------------
 
             serialized_product = ProductSerializer(
                 recommended_product,
@@ -158,24 +185,38 @@ class ProductRecommendationView(APIView):
                 },
             ).data
 
-            # Recommendation reasons
+            # ------------------------------------------------
+            # RECOMMENDATION REASONS
+            # ------------------------------------------------
+
             reasons = get_recommendation_reasons(
                 target_product=product,
-                recommended_product=recommended_product,
+               candidate_product =recommended_product,
                 user=current_user,
             )
 
+            # ------------------------------------------------
+            # RECOMMENDATION SCORE
+            # ------------------------------------------------
+
             serialized_product[
                 "recommendation_score"
-            ] = getattr(
-                recommended_product,
-                "recommendation_score",
-                0,
+            ] = round(
+                float(recommendation_score),
+                4
             )
+
+            # ------------------------------------------------
+            # RECOMMENDATION REASONS
+            # ------------------------------------------------
 
             serialized_product[
                 "recommendation_reasons"
             ] = reasons
+
+            # ------------------------------------------------
+            # RECOMMENDATION SIGNALS
+            # ------------------------------------------------
 
             serialized_product[
                 "recommendation_signals"
@@ -187,6 +228,10 @@ class ProductRecommendationView(APIView):
             recommendation_data.append(
                 serialized_product
             )
+
+        # ----------------------------------------------------
+        # FINAL RESPONSE
+        # ----------------------------------------------------
 
         return Response(
             {
@@ -380,6 +425,7 @@ class HomeRecommendationView(APIView):
         )
 
         # Preserve interaction order
+
         recently_viewed_map = {
             product.id: product
             for product in recently_viewed_products
@@ -446,18 +492,25 @@ class HomeRecommendationView(APIView):
                 limit=5,
             )
 
-            for product_data in recommendations:
+            for recommendation in recommendations:
 
                 # --------------------------------------------
-                # Recommendation engine returns DICTIONARY
+                # Engine returns:
+                #
+                # {
+                #     "product": Product,
+                #     "score": float
+                # }
                 # --------------------------------------------
 
-                product_id = product_data.get(
-                    "id"
+                recommended_product = recommendation.get(
+                    "product"
                 )
 
-                if not product_id:
+                if not recommended_product:
                     continue
+
+                product_id = recommended_product.id
 
                 # --------------------------------------------
                 # Don't recommend source product itself
@@ -507,6 +560,7 @@ class HomeRecommendationView(APIView):
         }
 
         # Preserve recommendation order
+
         ordered_personalized_products = [
             personalized_map[product_id]
             for product_id in personalized_ids
@@ -556,21 +610,41 @@ class HomeRecommendationView(APIView):
 
                 because_id_set = set()
 
-                for product_data in because_recommendations:
+                for recommendation in because_recommendations:
 
-                    # Recommendation engine returns dictionary
-                    product_id = product_data.get(
-                        "id"
+                    # ----------------------------------------
+                    # Engine returns:
+                    #
+                    # {
+                    #     "product": Product,
+                    #     "score": float
+                    # }
+                    # ----------------------------------------
+
+                    recommended_product = (
+                        recommendation.get(
+                            "product"
+                        )
                     )
 
-                    if not product_id:
+                    if not recommended_product:
                         continue
 
-                    # Don't recommend the viewed product itself
+                    product_id = (
+                        recommended_product.id
+                    )
+
+                    # ----------------------------------------
+                    # Don't recommend viewed product itself
+                    # ----------------------------------------
+
                     if product_id == viewed_product.id:
                         continue
 
+                    # ----------------------------------------
                     # Avoid duplicates
+                    # ----------------------------------------
+
                     if product_id in because_id_set:
                         continue
 
@@ -611,6 +685,7 @@ class HomeRecommendationView(APIView):
         }
 
         # Preserve recommendation order
+
         ordered_because_products = [
             because_map[product_id]
             for product_id in because_you_viewed_ids
@@ -634,6 +709,9 @@ class HomeRecommendationView(APIView):
         preferred_category_ids = []
 
         for interaction in recent_interactions:
+
+            if not interaction.product:
+                continue
 
             category_id = (
                 interaction.product.category_id
