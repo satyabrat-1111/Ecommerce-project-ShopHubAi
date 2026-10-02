@@ -257,6 +257,9 @@ class RecentOrdersView(APIView):
 
             data.append(
                 {
+                    "id":
+                        order.id,
+
                     "order_id":
                         order.id,
 

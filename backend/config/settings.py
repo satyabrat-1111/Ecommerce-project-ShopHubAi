@@ -146,6 +146,7 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
@@ -245,3 +246,17 @@ CACHES = {
         "LOCATION": "shophub-ai-recommendation-cache",
     }
 }
+
+# ============================================================
+# TWILIO VERIFY CONFIGURATION
+# ============================================================
+
+TWILIO_ACCOUNT_SID = config("TWILIO_ACCOUNT_SID")
+TWILIO_AUTH_TOKEN = config("TWILIO_AUTH_TOKEN")
+TWILIO_VERIFY_SERVICE_SID = config("TWILIO_VERIFY_SERVICE_SID")
+
+OPENAI_API_KEY = config("OPENAI_API_KEY", default="")
+OPENAI_VISION_MODEL = config(
+    "OPENAI_VISION_MODEL",
+    default="gpt-4o-mini",
+)

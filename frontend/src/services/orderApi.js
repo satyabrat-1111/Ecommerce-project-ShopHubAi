@@ -187,6 +187,62 @@ export const getOrderDetail = async (
 };
 
 
+export const getDeliveryIssueClaims = async (orderId) => {
+    const token = localStorage.getItem("access_token");
+
+    if (!token) {
+        throw new Error("Please login to view delivery issue reports.");
+    }
+
+    const response = await fetch(
+        `${API_BASE_URL}/orders/${orderId}/claims/`,
+        {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        }
+    );
+    const data = await response.json();
+
+    if (!response.ok) {
+        throw new Error(
+            data.detail || data.error || "Failed to load delivery issue reports."
+        );
+    }
+
+    return data;
+};
+
+
+export const createDeliveryIssueClaim = async (orderId, formData) => {
+    const token = localStorage.getItem("access_token");
+
+    if (!token) {
+        throw new Error("Please login to report a delivery issue.");
+    }
+
+    const response = await fetch(
+        `${API_BASE_URL}/orders/${orderId}/claims/`,
+        {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+            body: formData,
+        }
+    );
+    const data = await response.json();
+
+    if (!response.ok) {
+        throw new Error(
+            data.detail || data.error || "Failed to submit delivery issue report."
+        );
+    }
+
+    return data;
+};
+
+
 // =====================================
 // DOWNLOAD INVOICE
 // =====================================

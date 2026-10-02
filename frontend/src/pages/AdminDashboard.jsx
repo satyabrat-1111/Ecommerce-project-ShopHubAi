@@ -6,361 +6,342 @@ import {
     getAdminAnalytics,
     getRecentOrders,
     updateOrderStatus,
+    sendDeliveryOTP,
+    verifyDeliveryOTP,
     getRecommendationAnalytics,
+    getDeliveryIssueClaims,
+    reviewDeliveryIssueClaim,
 } from "../services/adminApi";
 
-
 function AdminDashboard() {
-
     const navigate = useNavigate();
-
-    // ============================================================
-    // DASHBOARD STATE
-    // ============================================================
 
     const [dashboard, setDashboard] = useState(null);
     const [analytics, setAnalytics] = useState(null);
     const [orders, setOrders] = useState([]);
-
-    // ============================================================
-    // RECOMMENDATION ANALYTICS STATE
-    // ============================================================
-
-    const [
-        recommendationAnalytics,
-        setRecommendationAnalytics
-    ] = useState(null);
-
-    // ============================================================
-    // GENERAL STATE
-    // ============================================================
+    const [deliveryClaims, setDeliveryClaims] = useState([]);
+    const [refundDates, setRefundDates] = useState({});
+    const [claimNotes, setClaimNotes] = useState({});
+    const [reviewingClaim, setReviewingClaim] = useState(null);
+    const [recommendationAnalytics, setRecommendationAnalytics] = useState(null);
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [updatingOrder, setUpdatingOrder] = useState(null);
 
-    // ============================================================
-    // THEME STATE
-    // ============================================================
+    const [sendingOTPOrder, setSendingOTPOrder] = useState(null);
+    const [verifyingOTPOrder, setVerifyingOTPOrder] = useState(null);
+    const [otpInputs, setOtpInputs] = useState({});
+    const [otpSentOrders, setOtpSentOrders] = useState({});
+    const [deliveryPhones, setDeliveryPhones] = useState({});
 
     const [darkMode, setDarkMode] = useState(() => {
-
-        const savedTheme =
-            localStorage.getItem(
-                "admin_dashboard_theme"
-            );
-
+        const savedTheme = localStorage.getItem("admin_dashboard_theme");
         return savedTheme === "dark";
     });
 
-
-    // ============================================================
-    // THEME OBJECT
-    // ============================================================
-
     const theme = darkMode
         ? {
-            page: "#0f172a",
-            card: "#1e293b",
-            cardHover: "#263449",
-            text: "#f8fafc",
-            secondaryText: "#cbd5e1",
-            mutedText: "#94a3b8",
-            border: "#334155",
-            input: "#0f172a",
-            tableHeader: "#273449",
-            tableHover: "#263449",
-            progressBg: "#334155",
-            shadow:
-                "0 10px 30px rgba(0,0,0,0.35)",
-        }
+              page: "#0f172a",
+              card: "#1e293b",
+              cardHover: "#263449",
+              text: "#f8fafc",
+              secondaryText: "#cbd5e1",
+              mutedText: "#94a3b8",
+              border: "#334155",
+              input: "#0f172a",
+              tableHeader: "#273449",
+              tableHover: "#263449",
+              progressBg: "#334155",
+              shadow: "0 10px 30px rgba(0,0,0,0.35)",
+          }
         : {
-            page: "#f8fafc",
-            card: "#ffffff",
-            cardHover: "#f8fafc",
-            text: "#111827",
-            secondaryText: "#4b5563",
-            mutedText: "#6b7280",
-            border: "#e5e7eb",
-            input: "#ffffff",
-            tableHeader: "#f8fafc",
-            tableHover: "#f8fafc",
-            progressBg: "#e5e7eb",
-            shadow:
-                "0 8px 25px rgba(15,23,42,0.08)",
-        };
-
-
-    // ============================================================
-    // SAVE THEME
-    // ============================================================
+              page: "#f8fafc",
+              card: "#ffffff",
+              cardHover: "#f8fafc",
+              text: "#111827",
+              secondaryText: "#4b5563",
+              mutedText: "#6b7280",
+              border: "#e5e7eb",
+              input: "#ffffff",
+              tableHeader: "#f8fafc",
+              tableHover: "#f8fafc",
+              progressBg: "#e5e7eb",
+              shadow: "0 8px 25px rgba(15,23,42,0.08)",
+          };
 
     useEffect(() => {
-
         localStorage.setItem(
             "admin_dashboard_theme",
-            darkMode
-                ? "dark"
-                : "light"
+            darkMode ? "dark" : "light"
         );
-
     }, [darkMode]);
 
-
-    // ============================================================
-    // LOAD ADMIN DASHBOARD
-    // ============================================================
-
     const loadDashboard = async () => {
-
         try {
-
             setLoading(true);
             setError("");
 
-
-            // ====================================================
-            // GET DASHBOARD
-            // ====================================================
-
-            const dashboardResponse =
-                await getAdminDashboard();
-
-            console.log(
-                "REAL ADMIN DASHBOARD RESPONSE:",
-                dashboardResponse
-            );
-
+            const [
+                dashboardResponse,
+                analyticsResponse,
+                ordersResponse,
+                recommendationResponse,
+                claimsResponse,
+            ] = await Promise.all([
+                getAdminDashboard(),
+                getAdminAnalytics(),
+                getRecentOrders(),
+                getRecommendationAnalytics(),
+                getDeliveryIssueClaims().catch((claimError) => {
+                    console.error("Delivery Issue Claims Error:", claimError);
+                    return [];
+                }),
+            ]);
 
             const dashboardData =
                 dashboardResponse?.data ||
                 dashboardResponse ||
                 {};
 
-
-            console.log(
-                "ADMIN DASHBOARD DATA:",
-                dashboardData
-            );
-
-
-            // ====================================================
-            // GET ANALYTICS
-            // ====================================================
-
-            const analyticsResponse =
-                await getAdminAnalytics();
-
-            console.log(
-                "REAL ADMIN ANALYTICS RESPONSE:",
-                JSON.stringify(
-                    analyticsResponse,
-                    null,
-                    2
-                )
-            );
-
-
             const analyticsData =
                 analyticsResponse?.data ||
                 analyticsResponse ||
                 {};
 
-
-            console.log(
-                "ADMIN ANALYTICS DATA:",
-                JSON.stringify(
-                    analyticsData,
-                    null,
-                    2
-                )
-            );
-
-
-            // ====================================================
-            // GET RECENT ORDERS
-            // ====================================================
-
-            const ordersResponse =
-                await getRecentOrders();
-
-            console.log(
-                "REAL ADMIN ORDERS RESPONSE:",
-                ordersResponse
-            );
-
-
-            const recentOrders =
-                Array.isArray(ordersResponse)
-                    ? ordersResponse
-                    : ordersResponse?.results ||
-                      ordersResponse?.recent_orders ||
-                      ordersResponse?.orders ||
-                      ordersResponse?.data ||
-                      [];
-
-
-            console.log(
-                "ADMIN RECENT ORDERS:",
-                recentOrders
-            );
-
-
-            // ====================================================
-            // GET RECOMMENDATION ANALYTICS
-            // ====================================================
-
-            const recommendationResponse =
-                await getRecommendationAnalytics();
-
-            console.log(
-                "REAL RECOMMENDATION ANALYTICS RESPONSE:",
-                JSON.stringify(
-                    recommendationResponse,
-                    null,
-                    2
-                )
-            );
-
+            const recentOrders = Array.isArray(ordersResponse)
+                ? ordersResponse
+                : ordersResponse?.results ||
+                  ordersResponse?.recent_orders ||
+                  ordersResponse?.orders ||
+                  ordersResponse?.data ||
+                  [];
 
             const recommendationData =
                 recommendationResponse?.data ||
                 recommendationResponse ||
                 {};
 
-
-            console.log(
-                "RECOMMENDATION ANALYTICS DATA:",
-                JSON.stringify(
-                    recommendationData,
-                    null,
-                    2
-                )
-            );
-
-
-            // ====================================================
-            // SAVE DATA
-            // ====================================================
-
             setDashboard(dashboardData);
-
             setAnalytics(analyticsData);
-
             setOrders(recentOrders);
-
-            setRecommendationAnalytics(
-                recommendationData
+            setDeliveryClaims(
+                Array.isArray(claimsResponse)
+                    ? claimsResponse
+                    : claimsResponse?.results || []
             );
-
+            setRecommendationAnalytics(recommendationData);
         } catch (error) {
-
-            console.error(
-                "Admin Dashboard Error:",
-                error
-            );
+            console.error("Admin Dashboard Error:", error);
 
             setError(
                 error.message ||
-                "Failed to load admin dashboard."
+                    "Failed to load admin dashboard."
             );
-
         } finally {
-
             setLoading(false);
-
         }
-
     };
 
-
-    // ============================================================
-    // INITIAL LOAD
-    // ============================================================
-
     useEffect(() => {
-
-        const token =
-            localStorage.getItem(
-                "access_token"
-            );
-
+        const token = localStorage.getItem("access_token");
 
         if (!token) {
-
             setLoading(false);
-
             setError(
                 "Please login to access Admin Dashboard."
             );
-
             return;
-
         }
 
-
         loadDashboard();
-
     }, []);
 
-
-    // ============================================================
-    // UPDATE ORDER STATUS
-    // ============================================================
-
-    const handleStatusChange = async (
-        orderId,
-        newStatus
-    ) => {
+    const handleStatusChange = async (orderId, newStatus) => {
+        if (newStatus === "Delivered") {
+            alert(
+                "Order can only be marked as Delivered after successful delivery OTP verification."
+            );
+            return;
+        }
 
         try {
-
             setUpdatingOrder(orderId);
 
+            await updateOrderStatus(orderId, newStatus);
 
-            await updateOrderStatus(
-                orderId,
-                newStatus
-            );
+            setDeliveryPhones((previous) => ({
+                ...previous,
+                [orderId]: "",
+            }));
 
+            setOtpInputs((previous) => ({
+                ...previous,
+                [orderId]: "",
+            }));
+
+            setOtpSentOrders((previous) => ({
+                ...previous,
+                [orderId]: false,
+            }));
 
             await loadDashboard();
 
-
-            alert(
-                "Order status updated successfully."
-            );
-
+            alert("Order status updated successfully.");
         } catch (error) {
-
-            console.error(
-                "Status Update Error:",
-                error
-            );
-
+            console.error("Status Update Error:", error);
 
             alert(
                 error.message ||
-                "Failed to update order status."
+                    "Failed to update order status."
             );
-
         } finally {
-
             setUpdatingOrder(null);
-
         }
-
     };
 
+    const handleSendDeliveryOTP = async (orderId) => {
+        const phone = String(
+            deliveryPhones[orderId] || ""
+        ).trim();
 
-    // ============================================================
-    // LOADING
-    // ============================================================
+        if (!phone) {
+            alert("Please enter the delivery phone number.");
+            return;
+        }
+
+        try {
+            setSendingOTPOrder(orderId);
+
+            const response = await sendDeliveryOTP(
+                orderId,
+                phone
+            );
+
+            setOtpSentOrders((previous) => ({
+                ...previous,
+                [orderId]: true,
+            }));
+
+            setOtpInputs((previous) => ({
+                ...previous,
+                [orderId]: "",
+            }));
+
+            alert(
+                response?.message ||
+                    "Delivery OTP sent successfully to the entered phone number."
+            );
+        } catch (error) {
+            console.error(
+                "Send Delivery OTP Error:",
+                error
+            );
+
+            alert(
+                error.message ||
+                    "Failed to send delivery OTP."
+            );
+        } finally {
+            setSendingOTPOrder(null);
+        }
+    };
+
+    const handleVerifyDeliveryOTP = async (orderId) => {
+        const otp = String(
+            otpInputs[orderId] || ""
+        ).trim();
+
+        if (!otp) {
+            alert(
+                "Please enter the 6-digit delivery OTP."
+            );
+            return;
+        }
+
+        if (!/^\d{6}$/.test(otp)) {
+            alert(
+                "Delivery OTP must be a valid 6-digit number."
+            );
+            return;
+        }
+
+        try {
+            setVerifyingOTPOrder(orderId);
+
+            const response = await verifyDeliveryOTP(
+                orderId,
+                otp
+            );
+
+            setOtpInputs((previous) => ({
+                ...previous,
+                [orderId]: "",
+            }));
+
+            setOtpSentOrders((previous) => ({
+                ...previous,
+                [orderId]: false,
+            }));
+
+            await loadDashboard();
+
+            alert(
+                response?.message ||
+                    "Delivery OTP verified successfully. Order has been marked as Delivered."
+            );
+        } catch (error) {
+            console.error(
+                "Verify Delivery OTP Error:",
+                error
+            );
+
+            alert(
+                error.message ||
+                    "Failed to verify delivery OTP."
+            );
+        } finally {
+            setVerifyingOTPOrder(null);
+        }
+    };
+
+    const handleReviewDeliveryClaim = async (claim, decision) => {
+        const defaultRefundDate = new Date();
+        defaultRefundDate.setDate(defaultRefundDate.getDate() + 7);
+
+        const refundDate =
+            refundDates[claim.id] ||
+            defaultRefundDate.toISOString().slice(0, 10);
+
+        try {
+            setReviewingClaim(claim.id);
+            const updatedClaim = await reviewDeliveryIssueClaim(
+                claim.id,
+                {
+                    decision,
+                    refund_processing_date:
+                        decision === "approved" ? refundDate : null,
+                    admin_note: claimNotes[claim.id] || "",
+                }
+            );
+
+            setDeliveryClaims((previous) =>
+                previous.map((item) =>
+                    item.id === claim.id ? updatedClaim : item
+                )
+            );
+        } catch (reviewError) {
+            alert(
+                reviewError.message ||
+                    "Unable to update this delivery issue report."
+            );
+        } finally {
+            setReviewingClaim(null);
+        }
+    };
 
     if (loading) {
-
         return (
-
             <div
                 style={{
                     minHeight: "70vh",
@@ -369,30 +350,19 @@ function AdminDashboard() {
                     alignItems: "center",
                     backgroundColor: theme.page,
                     color: theme.text,
-                    transition:
-                        "background-color 0.3s ease, color 0.3s ease",
                 }}
             >
-
-                <div
-                    style={{
-                        textAlign: "center",
-                    }}
-                >
-
+                <div style={{ textAlign: "center" }}>
                     <div
                         style={{
                             width: "50px",
                             height: "50px",
                             borderRadius: "50%",
-                            border:
-                                `4px solid ${theme.border}`,
-                            borderTopColor:
-                                "#007bff",
+                            border: `4px solid ${theme.border}`,
+                            borderTopColor: "#007bff",
                             animation:
                                 "adminSpin 1s linear infinite",
-                            margin:
-                                "0 auto 20px",
+                            margin: "0 auto 20px",
                         }}
                     />
 
@@ -402,13 +372,11 @@ function AdminDashboard() {
 
                     <p
                         style={{
-                            color:
-                                theme.secondaryText,
+                            color: theme.secondaryText,
                         }}
                     >
                         Please wait.
                     </p>
-
                 </div>
 
                 <style>
@@ -423,22 +391,12 @@ function AdminDashboard() {
                         }
                     `}
                 </style>
-
             </div>
-
         );
-
     }
 
-
-    // ============================================================
-    // ERROR
-    // ============================================================
-
     if (error) {
-
         return (
-
             <div
                 style={{
                     minHeight: "70vh",
@@ -446,29 +404,22 @@ function AdminDashboard() {
                     justifyContent: "center",
                     alignItems: "center",
                     padding: "20px",
-                    backgroundColor:
-                        theme.page,
-                    color:
-                        theme.text,
+                    backgroundColor: theme.page,
+                    color: theme.text,
                 }}
             >
-
                 <div
                     style={{
                         width: "100%",
                         maxWidth: "600px",
                         padding: "35px",
                         textAlign: "center",
-                        border:
-                            `1px solid ${theme.border}`,
+                        border: `1px solid ${theme.border}`,
                         borderRadius: "18px",
-                        backgroundColor:
-                            theme.card,
-                        boxShadow:
-                            theme.shadow,
+                        backgroundColor: theme.card,
+                        boxShadow: theme.shadow,
                     }}
                 >
-
                     <div
                         style={{
                             fontSize: "48px",
@@ -487,28 +438,23 @@ function AdminDashboard() {
                         Admin Dashboard Error
                     </h2>
 
-
                     <p
                         style={{
-                            color:
-                                theme.secondaryText,
+                            color: theme.secondaryText,
                             marginBottom: "25px",
                         }}
                     >
                         {error}
                     </p>
 
-
                     <button
                         onClick={loadDashboard}
                         style={{
-                            padding:
-                                "12px 24px",
+                            padding: "12px 24px",
                             cursor: "pointer",
                             border: "none",
                             borderRadius: "8px",
-                            backgroundColor:
-                                "#007bff",
+                            backgroundColor: "#007bff",
                             color: "#fff",
                             fontSize: "15px",
                             fontWeight: "600",
@@ -516,23 +462,13 @@ function AdminDashboard() {
                     >
                         🔄 Try Again
                     </button>
-
                 </div>
-
             </div>
-
         );
-
     }
 
-
-    // ============================================================
-    // DASHBOARD VALUES
-    // ============================================================
-
     const totalOrders =
-        dashboard?.total_orders ??
-        0;
+        dashboard?.total_orders ?? 0;
 
     const totalRevenue =
         dashboard?.total_sales ??
@@ -540,55 +476,34 @@ function AdminDashboard() {
         0;
 
     const pendingOrders =
-        dashboard?.pending_orders ??
-        0;
+        dashboard?.pending_orders ?? 0;
 
     const confirmedOrders =
-        dashboard?.confirmed_orders ??
-        0;
+        dashboard?.confirmed_orders ?? 0;
 
     const shippedOrders =
-        dashboard?.shipped_orders ??
-        0;
+        dashboard?.shipped_orders ?? 0;
 
     const deliveredOrders =
-        dashboard?.delivered_orders ??
-        0;
+        dashboard?.delivered_orders ?? 0;
 
     const cancelledOrders =
-        dashboard?.cancelled_orders ??
-        0;
-
-
-    // ============================================================
-    // PAYMENT VALUES
-    // ============================================================
+        dashboard?.cancelled_orders ?? 0;
 
     const successfulPayments =
-        analytics?.successful_payments ??
-        0;
+        analytics?.successful_payments ?? 0;
 
     const pendingPayments =
-        analytics?.pending_payments ??
-        0;
+        analytics?.pending_payments ?? 0;
 
     const failedPayments =
-        analytics?.failed_payments ??
-        0;
+        analytics?.failed_payments ?? 0;
 
     const totalSales =
-        analytics?.total_sales ??
-        0;
-
-
-    // ============================================================
-    // RECOMMENDATION VALUES
-    // ============================================================
+        analytics?.total_sales ?? 0;
 
     const recommendationSummary =
-        recommendationAnalytics?.summary ||
-        {};
-
+        recommendationAnalytics?.summary || {};
 
     const recommendationTopProducts =
         Array.isArray(
@@ -597,91 +512,52 @@ function AdminDashboard() {
             ? recommendationAnalytics.top_products
             : [];
 
-
     const totalRecommendationInteractions =
         Number(
             recommendationSummary.total_interactions
         ) || 0;
-
 
     const recommendationViews =
         Number(
             recommendationSummary.views
         ) || 0;
 
-
     const recommendationWishlist =
         Number(
             recommendationSummary.wishlist
         ) || 0;
-
 
     const recommendationCart =
         Number(
             recommendationSummary.cart
         ) || 0;
 
-
     const recommendationPurchase =
         Number(
             recommendationSummary.purchase
         ) || 0;
-
-
-    // ============================================================
-    // NEW CTR VALUES
-    // ============================================================
 
     const recommendationImpressions =
         Number(
             recommendationSummary.impressions
         ) || 0;
 
-
     const recommendationClicks =
         Number(
             recommendationSummary.clicks
         ) || 0;
-
 
     const recommendationCTR =
         Number(
             recommendationSummary.ctr
         ) || 0;
 
-
-    const recommendationViewsTracked =
-        Number(
-            recommendationSummary.recommendation_views
-        ) || 0;
-
-
-    const recommendationWishlistTracked =
-        Number(
-            recommendationSummary.recommendation_wishlist
-        ) || 0;
-
-
-    const recommendationCartTracked =
-        Number(
-            recommendationSummary.recommendation_cart
-        ) || 0;
-
-
     const recommendationPurchaseTracked =
         Number(
             recommendationSummary.recommendation_purchase
         ) || 0;
 
-
-    // ============================================================
-    // RECOMMENDATION PERCENTAGES
-    // ============================================================
-
-    const getRecommendationPercentage = (
-        value
-    ) => {
-
+    const getRecommendationPercentage = (value) => {
         if (
             totalRecommendationInteractions ===
             0
@@ -690,42 +566,31 @@ function AdminDashboard() {
         }
 
         return Math.round(
-            (
-                Number(value) /
-                totalRecommendationInteractions
-            ) * 100
+            (Number(value) /
+                totalRecommendationInteractions) *
+                100
         );
-
     };
-
 
     const recommendationViewPercentage =
         getRecommendationPercentage(
             recommendationViews
         );
 
-
     const recommendationWishlistPercentage =
         getRecommendationPercentage(
             recommendationWishlist
         );
-
 
     const recommendationCartPercentage =
         getRecommendationPercentage(
             recommendationCart
         );
 
-
     const recommendationPurchasePercentage =
         getRecommendationPercentage(
             recommendationPurchase
         );
-
-
-    // ============================================================
-    // TOP PRODUCT CALCULATION
-    // ============================================================
 
     const topProductInteractionAmounts =
         recommendationTopProducts.map(
@@ -735,19 +600,14 @@ function AdminDashboard() {
                 ) || 0
         );
 
-
     const maximumProductInteractions =
         topProductInteractionAmounts.length > 0
             ? Math.max(
-                ...topProductInteractionAmounts
-            )
+                  ...topProductInteractionAmounts
+              )
             : 0;
 
-
-    const getProductInteractionWidth = (
-        amount
-    ) => {
-
+    const getProductInteractionWidth = (amount) => {
         if (
             maximumProductInteractions ===
             0
@@ -758,77 +618,42 @@ function AdminDashboard() {
         return Math.max(
             5,
             Math.round(
-                (
-                    Number(amount) /
-                    maximumProductInteractions
-                ) * 100
+                (Number(amount) /
+                    maximumProductInteractions) *
+                    100
             )
         );
-
     };
-
-
-    // ============================================================
-    // ORDER PERCENTAGES
-    // ============================================================
 
     const safeTotalOrders =
         Number(totalOrders) || 0;
 
-
-    const getOrderPercentage = (
-        value
-    ) => {
-
-        if (
-            safeTotalOrders === 0
-        ) {
+    const getOrderPercentage = (value) => {
+        if (safeTotalOrders === 0) {
             return 0;
         }
 
         return Math.round(
-            (
-                Number(value) /
-                safeTotalOrders
-            ) * 100
+            (Number(value) /
+                safeTotalOrders) *
+                100
         );
-
     };
 
-
     const pendingPercentage =
-        getOrderPercentage(
-            pendingOrders
-        );
-
+        getOrderPercentage(pendingOrders);
 
     const confirmedPercentage =
-        getOrderPercentage(
-            confirmedOrders
-        );
-
+        getOrderPercentage(confirmedOrders);
 
     const shippedPercentage =
-        getOrderPercentage(
-            shippedOrders
-        );
-
+        getOrderPercentage(shippedOrders);
 
     const deliveredPercentage =
-        getOrderPercentage(
-            deliveredOrders
-        );
-
+        getOrderPercentage(deliveredOrders);
 
     const cancelledPercentage =
-        getOrderPercentage(
-            cancelledOrders
-        );
-
-
-    // ============================================================
-    // RECENT SALES
-    // ============================================================
+        getOrderPercentage(cancelledOrders);
 
     const recentOrderAmounts =
         orders.map(
@@ -838,19 +663,14 @@ function AdminDashboard() {
                 ) || 0
         );
 
-
     const maximumRecentOrderAmount =
         recentOrderAmounts.length > 0
             ? Math.max(
-                ...recentOrderAmounts
-            )
+                  ...recentOrderAmounts
+              )
             : 0;
 
-
-    const getSalesWidth = (
-        amount
-    ) => {
-
+    const getSalesWidth = (amount) => {
         if (
             maximumRecentOrderAmount ===
             0
@@ -861,40 +681,24 @@ function AdminDashboard() {
         return Math.max(
             5,
             Math.round(
-                (
-                    Number(amount) /
-                    maximumRecentOrderAmount
-                ) * 100
+                (Number(amount) /
+                    maximumRecentOrderAmount) *
+                    100
             )
         );
-
     };
-
-
-    // ============================================================
-    // CARD STYLE
-    // ============================================================
 
     const cardStyle = {
         padding: "25px",
-        border:
-            `1px solid ${theme.border}`,
+        border: `1px solid ${theme.border}`,
         borderRadius: "16px",
-        backgroundColor:
-            theme.card,
-        color:
-            theme.text,
-        boxShadow:
-            theme.shadow,
-        transition:
-            "all 0.25s ease",
+        backgroundColor: theme.card,
+        color: theme.text,
+        boxShadow: theme.shadow,
+        transition: "all 0.25s ease",
     };
 
-
-    const handleCardEnter = (
-        event
-    ) => {
-
+    const handleCardEnter = (event) => {
         event.currentTarget.style.transform =
             "translateY(-5px)";
 
@@ -902,114 +706,109 @@ function AdminDashboard() {
             darkMode
                 ? "0 14px 35px rgba(0,0,0,0.45)"
                 : "0 14px 35px rgba(15,23,42,0.12)";
-
     };
 
-
-    const handleCardLeave = (
-        event
-    ) => {
-
+    const handleCardLeave = (event) => {
         event.currentTarget.style.transform =
             "translateY(0)";
 
         event.currentTarget.style.boxShadow =
             theme.shadow;
-
     };
 
+    const getStatusStyle = (statusValue) => {
+        if (statusValue === "Delivered") {
+            return {
+                backgroundColor: "#dcfce7",
+                color: "#166534",
+            };
+        }
 
-    // ============================================================
-    // DASHBOARD
-    // ============================================================
+        if (statusValue === "Shipped") {
+            return {
+                backgroundColor: "#dbeafe",
+                color: "#1d4ed8",
+            };
+        }
+
+        if (statusValue === "Confirmed") {
+            return {
+                backgroundColor: "#fef3c7",
+                color: "#92400e",
+            };
+        }
+
+        if (statusValue === "Cancelled") {
+            return {
+                backgroundColor: "#fee2e2",
+                color: "#991b1b",
+            };
+        }
+
+        return {
+            backgroundColor: "#f3f4f6",
+            color: "#374151",
+        };
+    };
 
     return (
-
         <div
             style={{
                 minHeight: "100vh",
-                backgroundColor:
-                    theme.page,
-                color:
-                    theme.text,
-                padding:
-                    "30px 20px 60px",
-                transition:
-                    "background-color 0.3s ease, color 0.3s ease",
+                backgroundColor: theme.page,
+                color: theme.text,
+                padding: "30px 20px 60px",
             }}
         >
-
             <div
                 style={{
                     maxWidth: "1300px",
                     margin: "0 auto",
                 }}
             >
-
-                {/* ================================================= */}
-                {/* HEADER */}
-                {/* ================================================= */}
-
                 <div
                     style={{
                         marginBottom: "35px",
                     }}
                 >
-
                     <div
                         style={{
                             display: "flex",
-                            justifyContent:
-                                "space-between",
-                            alignItems:
-                                "center",
+                            justifyContent: "space-between",
+                            alignItems: "center",
                             gap: "20px",
-                            flexWrap:
-                                "wrap",
+                            flexWrap: "wrap",
                         }}
                     >
-
                         <div>
-
                             <h1
                                 style={{
-                                    margin:
-                                        "0 0 8px",
-                                    fontSize:
-                                        "34px",
-                                    letterSpacing:
-                                        "-0.5px",
+                                    margin: "0 0 8px",
+                                    fontSize: "34px",
+                                    letterSpacing: "-0.5px",
                                 }}
                             >
                                 Admin Dashboard 📊
                             </h1>
 
-
                             <p
                                 style={{
-                                    color:
-                                        theme.secondaryText,
+                                    color: theme.secondaryText,
                                     margin: 0,
                                 }}
                             >
                                 Manage ShopHubAI orders
                                 and monitor your store.
                             </p>
-
                         </div>
-
 
                         <div
                             style={{
                                 display: "flex",
                                 gap: "10px",
-                                flexWrap:
-                                    "wrap",
+                                flexWrap: "wrap",
                             }}
                         >
-
-                            {/* THEME BUTTON */}
-
                             <button
                                 onClick={() =>
                                     setDarkMode(
@@ -1018,33 +817,20 @@ function AdminDashboard() {
                                     )
                                 }
                                 style={{
-                                    padding:
-                                        "12px 18px",
-                                    border:
-                                        `1px solid ${theme.border}`,
-                                    borderRadius:
-                                        "10px",
-                                    backgroundColor:
-                                        theme.card,
-                                    color:
-                                        theme.text,
-                                    cursor:
-                                        "pointer",
-                                    fontSize:
-                                        "14px",
-                                    fontWeight:
-                                        "600",
-                                    transition:
-                                        "all 0.2s ease",
+                                    padding: "12px 18px",
+                                    border: `1px solid ${theme.border}`,
+                                    borderRadius: "10px",
+                                    backgroundColor: theme.card,
+                                    color: theme.text,
+                                    cursor: "pointer",
+                                    fontSize: "14px",
+                                    fontWeight: "600",
                                 }}
                             >
                                 {darkMode
                                     ? "☀️ Light Mode"
                                     : "🌙 Dark Mode"}
                             </button>
-
-
-                            {/* MANAGE PRODUCTS */}
 
                             <button
                                 onClick={() =>
@@ -1053,261 +839,270 @@ function AdminDashboard() {
                                     )
                                 }
                                 style={{
-                                    padding:
-                                        "12px 20px",
-                                    border:
-                                        "none",
-                                    borderRadius:
-                                        "10px",
+                                    padding: "12px 20px",
+                                    border: "none",
+                                    borderRadius: "10px",
                                     background:
                                         "linear-gradient(135deg, #007bff, #0056d6)",
-                                    color:
-                                        "#fff",
-                                    fontSize:
-                                        "15px",
-                                    fontWeight:
-                                        "600",
-                                    cursor:
-                                        "pointer",
-                                    boxShadow:
-                                        "0 5px 15px rgba(0,123,255,0.25)",
+                                    color: "#fff",
+                                    fontSize: "15px",
+                                    fontWeight: "600",
+                                    cursor: "pointer",
                                 }}
                             >
                                 🛍️ Manage Products
                             </button>
-
                         </div>
-
                     </div>
-
                 </div>
-
-
-                {/* ================================================= */}
-                {/* ORDER STATISTICS */}
-                {/* ================================================= */}
 
                 <h2
                     style={{
-                        marginBottom:
-                            "20px",
+                        marginBottom: "20px",
                     }}
                 >
                     Order Statistics
                 </h2>
 
-
                 <div
                     style={{
-                        display:
-                            "grid",
+                        display: "grid",
                         gridTemplateColumns:
                             "repeat(auto-fit, minmax(200px, 1fr))",
-                        gap:
-                            "20px",
-                        marginBottom:
-                            "40px",
+                        gap: "20px",
+                        marginBottom: "40px",
                     }}
                 >
-
                     {[
                         {
-                            title:
-                                "Total Orders",
-                            value:
-                                totalOrders,
-                            icon:
-                                "📦",
+                            title: "Total Orders",
+                            value: totalOrders,
+                            icon: "📦",
                         },
                         {
-                            title:
-                                "Total Revenue",
-                            value:
-                                `₹${totalRevenue}`,
-                            icon:
-                                "💰",
+                            title: "Total Revenue",
+                            value: `₹${totalRevenue}`,
+                            icon: "💰",
                         },
                         {
-                            title:
-                                "Pending Orders",
-                            value:
-                                pendingOrders,
-                            icon:
-                                "⏳",
+                            title: "Pending Orders",
+                            value: pendingOrders,
+                            icon: "⏳",
                         },
                         {
-                            title:
-                                "Confirmed Orders",
-                            value:
-                                confirmedOrders,
-                            icon:
-                                "✅",
+                            title: "Confirmed Orders",
+                            value: confirmedOrders,
+                            icon: "✅",
                         },
                         {
-                            title:
-                                "Shipped Orders",
-                            value:
-                                shippedOrders,
-                            icon:
-                                "🚚",
+                            title: "Shipped Orders",
+                            value: shippedOrders,
+                            icon: "🚚",
                         },
                         {
-                            title:
-                                "Delivered Orders",
-                            value:
-                                deliveredOrders,
-                            icon:
-                                "🎉",
+                            title: "Delivered Orders",
+                            value: deliveredOrders,
+                            icon: "🎉",
                         },
-                    ].map(
-                        (item) => (
-
+                    ].map((item) => (
+                        <div
+                            key={item.title}
+                            style={{
+                                ...cardStyle,
+                                cursor: "default",
+                            }}
+                            onMouseEnter={
+                                handleCardEnter
+                            }
+                            onMouseLeave={
+                                handleCardLeave
+                            }
+                        >
                             <div
-                                key={
-                                    item.title
-                                }
                                 style={{
-                                    ...cardStyle,
-                                    cursor:
-                                        "default",
+                                    display: "flex",
+                                    justifyContent:
+                                        "space-between",
+                                    alignItems: "center",
                                 }}
-                                onMouseEnter={
-                                    handleCardEnter
-                                }
-                                onMouseLeave={
-                                    handleCardLeave
-                                }
                             >
-
-                                <div
+                                <p
                                     style={{
-                                        display:
-                                            "flex",
-                                        justifyContent:
-                                            "space-between",
-                                        alignItems:
-                                            "center",
+                                        margin: 0,
+                                        color: theme.secondaryText,
                                     }}
                                 >
+                                    {item.title}
+                                </p>
 
-                                    <p
-                                        style={{
-                                            margin:
-                                                0,
-                                            color:
-                                                theme.secondaryText,
-                                        }}
-                                    >
-                                        {
-                                            item.title
-                                        }
-                                    </p>
-
-                                    <span
-                                        style={{
-                                            fontSize:
-                                                "25px",
-                                        }}
-                                    >
-                                        {
-                                            item.icon
-                                        }
-                                    </span>
-
-                                </div>
-
-
-                                <h2
+                                <span
                                     style={{
-                                        margin:
-                                            "12px 0 0",
-                                        fontSize:
-                                            "32px",
+                                        fontSize: "25px",
                                     }}
                                 >
-                                    {
-                                        item.value
-                                    }
-                                </h2>
-
+                                    {item.icon}
+                                </span>
                             </div>
 
-                        )
-                    )}
-
+                            <h2
+                                style={{
+                                    margin:
+                                        "12px 0 0",
+                                    fontSize: "32px",
+                                }}
+                            >
+                                {item.value}
+                            </h2>
+                        </div>
+                    ))}
                 </div>
-
-
-                {/* ================================================= */}
-                {/* PAYMENT ANALYTICS */}
-                {/* ================================================= */}
 
                 <h2
                     style={{
-                        marginBottom:
-                            "20px",
+                        marginBottom: "20px",
                     }}
                 >
                     Payment Analytics 💳
                 </h2>
 
+                <div
+                    style={{
+                        display: "grid",
+                        gridTemplateColumns:
+                            "repeat(auto-fit, minmax(200px, 1fr))",
+                        gap: "20px",
+                        marginBottom: "40px",
+                    }}
+                >
+                    {[
+                        {
+                            title: "Total Sales",
+                            value: `₹${totalSales}`,
+                            icon: "💰",
+                        },
+                        {
+                            title: "Successful Payments",
+                            value: successfulPayments,
+                            icon: "✅",
+                        },
+                        {
+                            title: "Pending Payments",
+                            value: pendingPayments,
+                            icon: "⏳",
+                        },
+                        {
+                            title: "Failed Payments",
+                            value: failedPayments,
+                            icon: "❌",
+                        },
+                    ].map((item) => (
+                        <div
+                            key={item.title}
+                            style={cardStyle}
+                            onMouseEnter={
+                                handleCardEnter
+                            }
+                            onMouseLeave={
+                                handleCardLeave
+                            }
+                        >
+                            <div
+                                style={{
+                                    display: "flex",
+                                    justifyContent:
+                                        "space-between",
+                                }}
+                            >
+                                <p
+                                    style={{
+                                        margin: 0,
+                                        color: theme.secondaryText,
+                                    }}
+                                >
+                                    {item.title}
+                                </p>
+
+                                <span
+                                    style={{
+                                        fontSize: "24px",
+                                    }}
+                                >
+                                    {item.icon}
+                                </span>
+                            </div>
+
+                            <h2
+                                style={{
+                                    margin:
+                                        "12px 0 0",
+                                    fontSize: "32px",
+                                }}
+                            >
+                                {item.value}
+                            </h2>
+                        </div>
+                    ))}
+                </div>
 
                 <div
                     style={{
-                        display:
-                            "grid",
-                        gridTemplateColumns:
-                            "repeat(auto-fit, minmax(200px, 1fr))",
-                        gap:
-                            "20px",
-                        marginBottom:
-                            "40px",
+                        marginBottom: "40px",
                     }}
                 >
+                    <h2>
+                        Recommendation Analytics
+                        🤖📊
+                    </h2>
 
-                    {[
-                        {
-                            title:
-                                "Total Sales",
-                            value:
-                                `₹${totalSales}`,
-                            icon:
-                                "💰",
-                        },
-                        {
-                            title:
-                                "Successful Payments",
-                            value:
-                                successfulPayments,
-                            icon:
-                                "✅",
-                        },
-                        {
-                            title:
-                                "Pending Payments",
-                            value:
-                                pendingPayments,
-                            icon:
-                                "⏳",
-                        },
-                        {
-                            title:
-                                "Failed Payments",
-                            value:
-                                failedPayments,
-                            icon:
-                                "❌",
-                        },
-                    ].map(
-                        (item) => (
+                    <p
+                        style={{
+                            color: theme.secondaryText,
+                        }}
+                    >
+                        Monitor recommendation
+                        performance and user activity.
+                    </p>
 
+                    <div
+                        style={{
+                            display: "grid",
+                            gridTemplateColumns:
+                                "repeat(auto-fit, minmax(220px, 1fr))",
+                            gap: "20px",
+                            marginBottom: "25px",
+                        }}
+                    >
+                        {[
+                            {
+                                title: "Impressions",
+                                value:
+                                    recommendationImpressions,
+                                icon: "👁️",
+                            },
+                            {
+                                title: "Clicks",
+                                value:
+                                    recommendationClicks,
+                                icon: "🖱️",
+                            },
+                            {
+                                title: "CTR",
+                                value:
+                                    `${recommendationCTR.toFixed(
+                                        2
+                                    )}%`,
+                                icon: "📈",
+                            },
+                            {
+                                title: "Purchases",
+                                value:
+                                    recommendationPurchaseTracked,
+                                icon: "🛍️",
+                            },
+                        ].map((item) => (
                             <div
-                                key={
-                                    item.title
-                                }
-                                style={{
-                                    ...cardStyle,
-                                }}
+                                key={item.title}
+                                style={cardStyle}
                                 onMouseEnter={
                                     handleCardEnter
                                 }
@@ -1315,16 +1110,108 @@ function AdminDashboard() {
                                     handleCardLeave
                                 }
                             >
-
                                 <div
                                     style={{
-                                        display:
-                                            "flex",
+                                        display: "flex",
                                         justifyContent:
                                             "space-between",
                                     }}
                                 >
+                                    <span
+                                        style={{
+                                            color:
+                                                theme.secondaryText,
+                                            fontWeight: "600",
+                                        }}
+                                    >
+                                        {item.title}
+                                    </span>
 
+                                    <span
+                                        style={{
+                                            fontSize: "28px",
+                                        }}
+                                    >
+                                        {item.icon}
+                                    </span>
+                                </div>
+
+                                <h2
+                                    style={{
+                                        fontSize: "32px",
+                                        margin:
+                                            "12px 0 0",
+                                    }}
+                                >
+                                    {item.value}
+                                </h2>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div
+                        style={{
+                            display: "grid",
+                            gridTemplateColumns:
+                                "repeat(auto-fit, minmax(200px, 1fr))",
+                            gap: "20px",
+                            marginBottom: "25px",
+                        }}
+                    >
+                        {[
+                            {
+                                title:
+                                    "Total Interactions",
+                                value:
+                                    totalRecommendationInteractions,
+                                icon: "⚡",
+                            },
+                            {
+                                title:
+                                    "Product Views",
+                                value:
+                                    recommendationViews,
+                                icon: "👁️",
+                            },
+                            {
+                                title:
+                                    "Wishlist",
+                                value:
+                                    recommendationWishlist,
+                                icon: "❤️",
+                            },
+                            {
+                                title:
+                                    "Cart",
+                                value:
+                                    recommendationCart,
+                                icon: "🛒",
+                            },
+                            {
+                                title:
+                                    "Purchase",
+                                value:
+                                    recommendationPurchase,
+                                icon: "🛍️",
+                            },
+                        ].map((item) => (
+                            <div
+                                key={item.title}
+                                style={cardStyle}
+                                onMouseEnter={
+                                    handleCardEnter
+                                }
+                                onMouseLeave={
+                                    handleCardLeave
+                                }
+                            >
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        justifyContent:
+                                            "space-between",
+                                    }}
+                                >
                                     <p
                                         style={{
                                             margin: 0,
@@ -1332,646 +1219,49 @@ function AdminDashboard() {
                                                 theme.secondaryText,
                                         }}
                                     >
-                                        {
-                                            item.title
-                                        }
+                                        {item.title}
                                     </p>
 
-                                    <span
-                                        style={{
-                                            fontSize:
-                                                "24px",
-                                        }}
-                                    >
-                                        {
-                                            item.icon
-                                        }
+                                    <span>
+                                        {item.icon}
                                     </span>
-
                                 </div>
-
 
                                 <h2
                                     style={{
                                         margin:
-                                            "12px 0 0",
-                                        fontSize:
-                                            "32px",
+                                            "10px 0 0",
+                                        fontSize: "32px",
                                     }}
                                 >
-                                    {
-                                        item.value
-                                    }
+                                    {item.value}
                                 </h2>
-
                             </div>
-
-                        )
-                    )}
-
-                </div>
-
-
-                {/* ================================================= */}
-                {/* RECOMMENDATION ANALYTICS */}
-                {/* ================================================= */}
-
-                <div
-                    style={{
-                        marginBottom:
-                            "40px",
-                    }}
-                >
-
-                    <div
-                        style={{
-                            display:
-                                "flex",
-                            justifyContent:
-                                "space-between",
-                            alignItems:
-                                "center",
-                            gap:
-                                "15px",
-                            flexWrap:
-                                "wrap",
-                            marginBottom:
-                                "20px",
-                        }}
-                    >
-
-                        <div>
-
-                            <h2
-                                style={{
-                                    margin:
-                                        0,
-                                }}
-                            >
-                                Recommendation Analytics
-                                🤖📊
-                            </h2>
-
-                            <p
-                                style={{
-                                    color:
-                                        theme.secondaryText,
-                                    marginTop:
-                                        "8px",
-                                }}
-                            >
-                                Monitor recommendation
-                                performance and user activity.
-                            </p>
-
-                        </div>
-
+                        ))}
                     </div>
-
-
-                    {/* ================================================= */}
-                    {/* RECOMMENDATION PERFORMANCE */}
-                    {/* ================================================= */}
-
-                    <h3
-                        style={{
-                            marginBottom:
-                                "15px",
-                        }}
-                    >
-                        Recommendation Performance 🚀
-                    </h3>
-
-
-                    <div
-                        style={{
-                            display:
-                                "grid",
-                            gridTemplateColumns:
-                                "repeat(auto-fit, minmax(220px, 1fr))",
-                            gap:
-                                "20px",
-                            marginBottom:
-                                "25px",
-                        }}
-                    >
-
-                        {/* IMPRESSIONS */}
-
-                        <div
-                            style={{
-                                ...cardStyle,
-                                borderTop:
-                                    "4px solid #007bff",
-                            }}
-                            onMouseEnter={
-                                handleCardEnter
-                            }
-                            onMouseLeave={
-                                handleCardLeave
-                            }
-                        >
-
-                            <div
-                                style={{
-                                    display:
-                                        "flex",
-                                    justifyContent:
-                                        "space-between",
-                                    alignItems:
-                                        "center",
-                                }}
-                            >
-
-                                <span
-                                    style={{
-                                        color:
-                                            theme.secondaryText,
-                                        fontWeight:
-                                            "600",
-                                    }}
-                                >
-                                    Impressions
-                                </span>
-
-                                <span
-                                    style={{
-                                        fontSize:
-                                            "28px",
-                                    }}
-                                >
-                                    👁️
-                                </span>
-
-                            </div>
-
-
-                            <h2
-                                style={{
-                                    fontSize:
-                                        "36px",
-                                    margin:
-                                        "12px 0 5px",
-                                }}
-                            >
-                                {
-                                    recommendationImpressions
-                                }
-                            </h2>
-
-
-                            <p
-                                style={{
-                                    margin:
-                                        0,
-                                    color:
-                                        theme.mutedText,
-                                    fontSize:
-                                        "13px",
-                                }}
-                            >
-                                Recommendations shown
-                            </p>
-
-                        </div>
-
-
-                        {/* CLICKS */}
-
-                        <div
-                            style={{
-                                ...cardStyle,
-                                borderTop:
-                                    "4px solid #6f42c1",
-                            }}
-                            onMouseEnter={
-                                handleCardEnter
-                            }
-                            onMouseLeave={
-                                handleCardLeave
-                            }
-                        >
-
-                            <div
-                                style={{
-                                    display:
-                                        "flex",
-                                    justifyContent:
-                                        "space-between",
-                                }}
-                            >
-
-                                <span
-                                    style={{
-                                        color:
-                                            theme.secondaryText,
-                                        fontWeight:
-                                            "600",
-                                    }}
-                                >
-                                    Clicks
-                                </span>
-
-                                <span
-                                    style={{
-                                        fontSize:
-                                            "28px",
-                                    }}
-                                >
-                                    🖱️
-                                </span>
-
-                            </div>
-
-
-                            <h2
-                                style={{
-                                    fontSize:
-                                        "36px",
-                                    margin:
-                                        "12px 0 5px",
-                                }}
-                            >
-                                {
-                                    recommendationClicks
-                                }
-                            </h2>
-
-
-                            <p
-                                style={{
-                                    margin:
-                                        0,
-                                    color:
-                                        theme.mutedText,
-                                    fontSize:
-                                        "13px",
-                                }}
-                            >
-                                Recommendation clicks
-                            </p>
-
-                        </div>
-
-
-                        {/* CTR */}
-
-                        <div
-                            style={{
-                                ...cardStyle,
-                                borderTop:
-                                    "4px solid #28a745",
-                            }}
-                            onMouseEnter={
-                                handleCardEnter
-                            }
-                            onMouseLeave={
-                                handleCardLeave
-                            }
-                        >
-
-                            <div
-                                style={{
-                                    display:
-                                        "flex",
-                                    justifyContent:
-                                        "space-between",
-                                }}
-                            >
-
-                                <span
-                                    style={{
-                                        color:
-                                            theme.secondaryText,
-                                        fontWeight:
-                                            "600",
-                                    }}
-                                >
-                                    CTR
-                                </span>
-
-                                <span
-                                    style={{
-                                        fontSize:
-                                            "28px",
-                                    }}
-                                >
-                                    📈
-                                </span>
-
-                            </div>
-
-
-                            <h2
-                                style={{
-                                    fontSize:
-                                        "36px",
-                                    margin:
-                                        "12px 0 5px",
-                                }}
-                            >
-                                {
-                                    recommendationCTR.toFixed(
-                                        2
-                                    )
-                                }%
-                            </h2>
-
-
-                            <p
-                                style={{
-                                    margin:
-                                        0,
-                                    color:
-                                        theme.mutedText,
-                                    fontSize:
-                                        "13px",
-                                }}
-                            >
-                                Click-through rate
-                            </p>
-
-
-                            <div
-                                style={{
-                                    marginTop:
-                                        "12px",
-                                    height:
-                                        "7px",
-                                    backgroundColor:
-                                        theme.progressBg,
-                                    borderRadius:
-                                        "10px",
-                                    overflow:
-                                        "hidden",
-                                }}
-                            >
-
-                                <div
-                                    style={{
-                                        width:
-                                            `${Math.min(
-                                                100,
-                                                recommendationCTR
-                                            )}%`,
-                                        height:
-                                            "100%",
-                                        backgroundColor:
-                                            "#28a745",
-                                        borderRadius:
-                                            "10px",
-                                        transition:
-                                            "width 0.6s ease",
-                                    }}
-                                />
-
-                            </div>
-
-                        </div>
-
-
-                        {/* CONVERSION SIGNAL */}
-
-                        <div
-                            style={{
-                                ...cardStyle,
-                                borderTop:
-                                    "4px solid #fd7e14",
-                            }}
-                            onMouseEnter={
-                                handleCardEnter
-                            }
-                            onMouseLeave={
-                                handleCardLeave
-                            }
-                        >
-
-                            <div
-                                style={{
-                                    display:
-                                        "flex",
-                                    justifyContent:
-                                        "space-between",
-                                }}
-                            >
-
-                                <span
-                                    style={{
-                                        color:
-                                            theme.secondaryText,
-                                        fontWeight:
-                                            "600",
-                                    }}
-                                >
-                                    Purchases
-                                </span>
-
-                                <span
-                                    style={{
-                                        fontSize:
-                                            "28px",
-                                    }}
-                                >
-                                    🛍️
-                                </span>
-
-                            </div>
-
-
-                            <h2
-                                style={{
-                                    fontSize:
-                                        "36px",
-                                    margin:
-                                        "12px 0 5px",
-                                }}
-                            >
-                                {
-                                    recommendationPurchaseTracked
-                                }
-                            </h2>
-
-
-                            <p
-                                style={{
-                                    margin:
-                                        0,
-                                    color:
-                                        theme.mutedText,
-                                    fontSize:
-                                        "13px",
-                                }}
-                            >
-                                Recommendation purchases
-                            </p>
-
-                        </div>
-
-                    </div>
-
-
-                    {/* ================================================= */}
-                    {/* EXISTING RECOMMENDATION SUMMARY */}
-                    {/* ================================================= */}
-
-                    <div
-                        style={{
-                            display:
-                                "grid",
-                            gridTemplateColumns:
-                                "repeat(auto-fit, minmax(200px, 1fr))",
-                            gap:
-                                "20px",
-                            marginBottom:
-                                "25px",
-                        }}
-                    >
-
-                        {[
-                            {
-                                title:
-                                    "Total Interactions",
-                                value:
-                                    totalRecommendationInteractions,
-                                icon:
-                                    "⚡",
-                            },
-                            {
-                                title:
-                                    "Product Views",
-                                value:
-                                    recommendationViews,
-                                icon:
-                                    "👁️",
-                            },
-                            {
-                                title:
-                                    "Wishlist",
-                                value:
-                                    recommendationWishlist,
-                                icon:
-                                    "❤️",
-                            },
-                            {
-                                title:
-                                    "Cart",
-                                value:
-                                    recommendationCart,
-                                icon:
-                                    "🛒",
-                            },
-                            {
-                                title:
-                                    "Purchase",
-                                value:
-                                    recommendationPurchase,
-                                icon:
-                                    "🛍️",
-                            },
-                        ].map(
-                            (item) => (
-
-                                <div
-                                    key={
-                                        item.title
-                                    }
-                                    style={{
-                                        ...cardStyle,
-                                    }}
-                                    onMouseEnter={
-                                        handleCardEnter
-                                    }
-                                    onMouseLeave={
-                                        handleCardLeave
-                                    }
-                                >
-
-                                    <div
-                                        style={{
-                                            display:
-                                                "flex",
-                                            justifyContent:
-                                                "space-between",
-                                        }}
-                                    >
-
-                                        <p
-                                            style={{
-                                                margin:
-                                                    0,
-                                                color:
-                                                    theme.secondaryText,
-                                            }}
-                                        >
-                                            {
-                                                item.title
-                                            }
-                                        </p>
-
-                                        <span>
-                                            {
-                                                item.icon
-                                            }
-                                        </span>
-
-                                    </div>
-
-
-                                    <h2
-                                        style={{
-                                            margin:
-                                                "10px 0 0",
-                                            fontSize:
-                                                "32px",
-                                        }}
-                                    >
-                                        {
-                                            item.value
-                                        }
-                                    </h2>
-
-                                </div>
-
-                            )
-                        )}
-
-                    </div>
-
-
-                    {/* ================================================= */}
-                    {/* INTERACTION DISTRIBUTION */}
-                    {/* ================================================= */}
 
                     <div
                         style={{
                             ...cardStyle,
-                            marginBottom:
-                                "25px",
+                            marginBottom: "25px",
                         }}
                     >
-
                         <h3
                             style={{
-                                marginTop:
-                                    0,
-                                marginBottom:
-                                    "25px",
+                                marginTop: 0,
+                                marginBottom: "25px",
                             }}
                         >
                             Interaction Distribution
                         </h3>
 
-
                         {[
                             {
-                                label:
-                                    "👁️ Views",
+                                label: "👁️ Views",
                                 value:
                                     recommendationViews,
                                 percentage:
                                     recommendationViewPercentage,
-                                color:
-                                    "#007bff",
                             },
                             {
                                 label:
@@ -1980,18 +1270,13 @@ function AdminDashboard() {
                                     recommendationWishlist,
                                 percentage:
                                     recommendationWishlistPercentage,
-                                color:
-                                    "#e83e8c",
                             },
                             {
-                                label:
-                                    "🛒 Cart",
+                                label: "🛒 Cart",
                                 value:
                                     recommendationCart,
                                 percentage:
                                     recommendationCartPercentage,
-                                color:
-                                    "#6f42c1",
                             },
                             {
                                 label:
@@ -2000,830 +1285,145 @@ function AdminDashboard() {
                                     recommendationPurchase,
                                 percentage:
                                     recommendationPurchasePercentage,
-                                color:
-                                    "#28a745",
                             },
-                        ].map(
-                            (item) => (
-
+                        ].map((item) => (
+                            <div
+                                key={item.label}
+                                style={{
+                                    marginBottom:
+                                        "20px",
+                                }}
+                            >
                                 <div
-                                    key={
-                                        item.label
-                                    }
                                     style={{
+                                        display: "flex",
+                                        justifyContent:
+                                            "space-between",
                                         marginBottom:
-                                            "20px",
+                                            "7px",
                                     }}
                                 >
-
-                                    <div
+                                    <span
                                         style={{
-                                            display:
-                                                "flex",
-                                            justifyContent:
-                                                "space-between",
-                                            marginBottom:
-                                                "7px",
+                                            color:
+                                                theme.secondaryText,
                                         }}
                                     >
+                                        {item.label}
+                                    </span>
 
-                                        <span>
-                                            {
-                                                item.label
-                                            }
-                                        </span>
-
-                                        <strong>
-                                            {
-                                                item.value
-                                            }{" "}
-                                            (
-                                            {
-                                                item.percentage
-                                            }%)
-                                        </strong>
-
-                                    </div>
-
-
-                                    <div
+                                    <span
                                         style={{
-                                            width:
-                                                "100%",
-                                            height:
-                                                "10px",
-                                            backgroundColor:
-                                                theme.progressBg,
-                                            borderRadius:
-                                                "10px",
-                                            overflow:
-                                                "hidden",
+                                            color:
+                                                theme.text,
+                                            fontWeight:
+                                                "600",
                                         }}
                                     >
-
-                                        <div
-                                            style={{
-                                                width:
-                                                    `${item.percentage}%`,
-                                                height:
-                                                    "100%",
-                                                backgroundColor:
-                                                    item.color,
-                                                borderRadius:
-                                                    "10px",
-                                                transition:
-                                                    "width 0.6s ease",
-                                            }}
-                                        />
-
-                                    </div>
-
+                                        {item.value} (
+                                        {
+                                            item.percentage
+                                        }
+                                        %)
+                                    </span>
                                 </div>
-
-                            )
-                        )}
-
-                    </div>
-
-
-                    {/* ================================================= */}
-                    {/* TOP PRODUCTS */}
-                    {/* ================================================= */}
-
-                    <div
-                        style={{
-                            ...cardStyle,
-                            overflowX:
-                                "auto",
-                        }}
-                    >
-
-                        <h3
-                            style={{
-                                marginTop:
-                                    0,
-                                marginBottom:
-                                    "25px",
-                            }}
-                        >
-                            Top Products by User
-                            Interactions 🔥
-                        </h3>
-
-
-                        {
-                            recommendationTopProducts.length ===
-                            0 ? (
 
                                 <div
                                     style={{
-                                        padding:
-                                            "30px",
-                                        textAlign:
-                                            "center",
-                                        color:
-                                            theme.secondaryText,
-                                        border:
-                                            `1px dashed ${theme.border}`,
+                                        height: "8px",
+                                        backgroundColor:
+                                            theme.progressBg,
                                         borderRadius:
                                             "10px",
+                                        overflow:
+                                            "hidden",
                                     }}
                                 >
-                                    No recommendation
-                                    interaction data
-                                    available yet.
-                                </div>
-
-                            ) : (
-
-                                <table
-                                    style={{
-                                        width:
-                                            "100%",
-                                        borderCollapse:
-                                            "collapse",
-                                        minWidth:
-                                            "850px",
-                                    }}
-                                >
-
-                                    <thead>
-
-                                        <tr>
-
-                                            {[
-                                                "Product ID",
-                                                "Product",
-                                                "Views",
-                                                "Wishlist",
-                                                "Cart",
-                                                "Purchase",
-                                                "Total",
-                                            ].map(
-                                                (
-                                                    heading
-                                                ) => (
-
-                                                    <th
-                                                        key={
-                                                            heading
-                                                        }
-                                                        style={{
-                                                            border:
-                                                                `1px solid ${theme.border}`,
-                                                            padding:
-                                                                "12px",
-                                                            textAlign:
-                                                                heading ===
-                                                                "Product"
-                                                                    ? "left"
-                                                                    : "center",
-                                                            backgroundColor:
-                                                                theme.tableHeader,
-                                                            color:
-                                                                theme.text,
-                                                        }}
-                                                    >
-                                                        {
-                                                            heading
-                                                        }
-                                                    </th>
-
-                                                )
-                                            )}
-
-                                        </tr>
-
-                                    </thead>
-
-
-                                    <tbody>
-
-                                        {
-                                            recommendationTopProducts.map(
-                                                (
-                                                    product
-                                                ) => {
-
-                                                    const interactionWidth =
-                                                        getProductInteractionWidth(
-                                                            product.total_interactions
-                                                        );
-
-
-                                                    return (
-
-                                                        <tr
-                                                            key={
-                                                                product.product_id
-                                                            }
-                                                            onMouseEnter={(
-                                                                event
-                                                            ) => {
-                                                                event.currentTarget.style.backgroundColor =
-                                                                    theme.tableHover;
-                                                            }}
-                                                            onMouseLeave={(
-                                                                event
-                                                            ) => {
-                                                                event.currentTarget.style.backgroundColor =
-                                                                    "transparent";
-                                                            }}
-                                                        >
-
-                                                            <td
-                                                                style={{
-                                                                    border:
-                                                                        `1px solid ${theme.border}`,
-                                                                    padding:
-                                                                        "12px",
-                                                                    textAlign:
-                                                                        "center",
-                                                                }}
-                                                            >
-                                                                #
-                                                                {
-                                                                    product.product_id
-                                                                }
-                                                            </td>
-
-
-                                                            <td
-                                                                style={{
-                                                                    border:
-                                                                        `1px solid ${theme.border}`,
-                                                                    padding:
-                                                                        "12px",
-                                                                    minWidth:
-                                                                        "220px",
-                                                                }}
-                                                            >
-
-                                                                <div
-                                                                    style={{
-                                                                        fontWeight:
-                                                                            "600",
-                                                                        marginBottom:
-                                                                            "8px",
-                                                                    }}
-                                                                >
-                                                                    {
-                                                                        product.product_name
-                                                                    }
-                                                                </div>
-
-
-                                                                <div
-                                                                    style={{
-                                                                        width:
-                                                                            "100%",
-                                                                        height:
-                                                                            "7px",
-                                                                        backgroundColor:
-                                                                            theme.progressBg,
-                                                                        borderRadius:
-                                                                            "10px",
-                                                                        overflow:
-                                                                            "hidden",
-                                                                    }}
-                                                                >
-
-                                                                    <div
-                                                                        style={{
-                                                                            width:
-                                                                                `${interactionWidth}%`,
-                                                                            height:
-                                                                                "100%",
-                                                                            backgroundColor:
-                                                                                "#007bff",
-                                                                            borderRadius:
-                                                                                "10px",
-                                                                            transition:
-                                                                                "width 0.5s ease",
-                                                                        }}
-                                                                    />
-
-                                                                </div>
-
-                                                            </td>
-
-
-                                                            <td
-                                                                style={{
-                                                                    border:
-                                                                        `1px solid ${theme.border}`,
-                                                                    padding:
-                                                                        "12px",
-                                                                    textAlign:
-                                                                        "center",
-                                                                }}
-                                                            >
-                                                                {
-                                                                    product.views ??
-                                                                    0
-                                                                }
-                                                            </td>
-
-
-                                                            <td
-                                                                style={{
-                                                                    border:
-                                                                        `1px solid ${theme.border}`,
-                                                                    padding:
-                                                                        "12px",
-                                                                    textAlign:
-                                                                        "center",
-                                                                }}
-                                                            >
-                                                                {
-                                                                    product.wishlist ??
-                                                                    0
-                                                                }
-                                                            </td>
-
-
-                                                            <td
-                                                                style={{
-                                                                    border:
-                                                                        `1px solid ${theme.border}`,
-                                                                    padding:
-                                                                        "12px",
-                                                                    textAlign:
-                                                                        "center",
-                                                                }}
-                                                            >
-                                                                {
-                                                                    product.cart ??
-                                                                    0
-                                                                }
-                                                            </td>
-
-
-                                                            <td
-                                                                style={{
-                                                                    border:
-                                                                        `1px solid ${theme.border}`,
-                                                                    padding:
-                                                                        "12px",
-                                                                    textAlign:
-                                                                        "center",
-                                                                }}
-                                                            >
-                                                                {
-                                                                    product.purchase ??
-                                                                    0
-                                                                }
-                                                            </td>
-
-
-                                                            <td
-                                                                style={{
-                                                                    border:
-                                                                        `1px solid ${theme.border}`,
-                                                                    padding:
-                                                                        "12px",
-                                                                    textAlign:
-                                                                        "center",
-                                                                    fontWeight:
-                                                                        "700",
-                                                                }}
-                                                            >
-                                                                {
-                                                                    product.total_interactions ??
-                                                                    0
-                                                                }
-                                                            </td>
-
-                                                        </tr>
-
-                                                    );
-
-                                                }
-                                            )
-                                        }
-
-                                    </tbody>
-
-                                </table>
-
-                            )
-                        }
-
-                    </div>
-
-                </div>
-
-
-                {/* ================================================= */}
-                {/* ANALYTICS OVERVIEW */}
-                {/* ================================================= */}
-
-                <h2
-                    style={{
-                        marginBottom:
-                            "20px",
-                    }}
-                >
-                    Analytics Overview 📈
-                </h2>
-
-
-                <div
-                    style={{
-                        display:
-                            "grid",
-                        gridTemplateColumns:
-                            "repeat(auto-fit, minmax(350px, 1fr))",
-                        gap:
-                            "25px",
-                        marginBottom:
-                            "40px",
-                    }}
-                >
-
-                    {/* ORDER STATUS */}
-
-                    <div
-                        style={{
-                            ...cardStyle,
-                        }}
-                    >
-
-                        <h3
-                            style={{
-                                marginTop:
-                                    0,
-                                marginBottom:
-                                    "25px",
-                            }}
-                        >
-                            Orders by Status
-                        </h3>
-
-
-                        {[
-                            {
-                                name:
-                                    "Pending",
-                                value:
-                                    pendingOrders,
-                                percentage:
-                                    pendingPercentage,
-                                color:
-                                    "#f0ad4e",
-                            },
-                            {
-                                name:
-                                    "Confirmed",
-                                value:
-                                    confirmedOrders,
-                                percentage:
-                                    confirmedPercentage,
-                                color:
-                                    "#007bff",
-                            },
-                            {
-                                name:
-                                    "Shipped",
-                                value:
-                                    shippedOrders,
-                                percentage:
-                                    shippedPercentage,
-                                color:
-                                    "#6f42c1",
-                            },
-                            {
-                                name:
-                                    "Delivered",
-                                value:
-                                    deliveredOrders,
-                                percentage:
-                                    deliveredPercentage,
-                                color:
-                                    "#28a745",
-                            },
-                            {
-                                name:
-                                    "Cancelled",
-                                value:
-                                    cancelledOrders,
-                                percentage:
-                                    cancelledPercentage,
-                                color:
-                                    "#dc3545",
-                            },
-                        ].map(
-                            (item) => (
-
-                                <div
-                                    key={
-                                        item.name
-                                    }
-                                    style={{
-                                        marginBottom:
-                                            "20px",
-                                    }}
-                                >
-
                                     <div
                                         style={{
-                                            display:
-                                                "flex",
-                                            justifyContent:
-                                                "space-between",
-                                            marginBottom:
-                                                "7px",
-                                        }}
-                                    >
-
-                                        <span>
-                                            {
-                                                item.name
-                                            }
-                                        </span>
-
-                                        <strong>
-                                            {
-                                                item.value
-                                            }{" "}
-                                            (
-                                            {
-                                                item.percentage
-                                            }%)
-                                        </strong>
-
-                                    </div>
-
-
-                                    <div
-                                        style={{
-                                            height:
-                                                "10px",
+                                            width: `${item.percentage}%`,
+                                            height: "100%",
                                             backgroundColor:
-                                                theme.progressBg,
+                                                "#007bff",
                                             borderRadius:
                                                 "10px",
-                                            overflow:
-                                                "hidden",
                                         }}
-                                    >
-
-                                        <div
-                                            style={{
-                                                width:
-                                                    `${item.percentage}%`,
-                                                height:
-                                                    "100%",
-                                                backgroundColor:
-                                                    item.color,
-                                                borderRadius:
-                                                    "10px",
-                                                transition:
-                                                    "width 0.5s ease",
-                                            }}
-                                        />
-
-                                    </div>
-
+                                    />
                                 </div>
-
-                            )
-                        )}
-
+                            </div>
+                        ))}
                     </div>
 
-
-                    {/* PAYMENT STATUS */}
-
-                    <div
-                        style={{
-                            ...cardStyle,
-                        }}
-                    >
-
+                    <div style={cardStyle}>
                         <h3
                             style={{
-                                marginTop:
-                                    0,
+                                marginTop: 0,
                                 marginBottom:
-                                    "25px",
+                                    "20px",
                             }}
                         >
-                            Payment Status
+                            Top Recommended Products
                         </h3>
 
-
-                        {[
-                            {
-                                name:
-                                    "Successful",
-                                value:
-                                    successfulPayments,
-                                color:
-                                    "#28a745",
-                            },
-                            {
-                                name:
-                                    "Pending",
-                                value:
-                                    pendingPayments,
-                                color:
-                                    "#f0ad4e",
-                            },
-                            {
-                                name:
-                                    "Failed",
-                                value:
-                                    failedPayments,
-                                color:
-                                    "#dc3545",
-                            },
-                        ].map(
-                            (item) => (
-
-                                <div
-                                    key={
-                                        item.name
-                                    }
-                                    style={{
-                                        marginBottom:
-                                            "20px",
-                                    }}
-                                >
-
-                                    <div
-                                        style={{
-                                            display:
-                                                "flex",
-                                            justifyContent:
-                                                "space-between",
-                                            marginBottom:
-                                                "7px",
-                                        }}
-                                    >
-
-                                        <span>
-                                            {
-                                                item.name
-                                            }
-                                        </span>
-
-                                        <strong>
-                                            {
-                                                item.value
-                                            }
-                                        </strong>
-
-                                    </div>
-
-
-                                    <div
-                                        style={{
-                                            height:
-                                                "10px",
-                                            backgroundColor:
-                                                theme.progressBg,
-                                            borderRadius:
-                                                "10px",
-                                            overflow:
-                                                "hidden",
-                                        }}
-                                    >
-
-                                        <div
-                                            style={{
-                                                width:
-                                                    `${Math.min(
-                                                        100,
-                                                        Number(
-                                                            item.value
-                                                        )
-                                                    )}%`,
-                                                height:
-                                                    "100%",
-                                                backgroundColor:
-                                                    item.color,
-                                                borderRadius:
-                                                    "10px",
-                                            }}
-                                        />
-
-                                    </div>
-
-                                </div>
-
-                            )
-                        )}
-
-                    </div>
-
-                </div>
-
-
-                {/* ================================================= */}
-                {/* RECENT SALES */}
-                {/* ================================================= */}
-
-                <div
-                    style={{
-                        ...cardStyle,
-                        marginBottom:
-                            "40px",
-                    }}
-                >
-
-                    <h3
-                        style={{
-                            marginTop:
-                                0,
-                            marginBottom:
-                                "25px",
-                        }}
-                    >
-                        Recent Orders Revenue 📊
-                    </h3>
-
-
-                    {
-                        orders.length === 0 ? (
-
+                        {recommendationTopProducts.length ===
+                        0 ? (
                             <p
                                 style={{
                                     color:
-                                        theme.secondaryText,
+                                        theme.mutedText,
                                 }}
                             >
-                                No sales data available.
+                                No recommendation
+                                product data available.
                             </p>
-
                         ) : (
-
-                            orders.map(
-                                (order) => {
-
-                                    const orderId =
-                                        order.order_id ||
-                                        order.id;
-
-
+                            recommendationTopProducts.map(
+                                (product, index) => {
                                     const amount =
                                         Number(
-                                            order.total_amount
+                                            product.total_interactions
                                         ) || 0;
 
-
-                                    const width =
-                                        getSalesWidth(
-                                            amount
-                                        );
-
-
                                     return (
-
                                         <div
                                             key={
-                                                orderId
+                                                product.product_id ||
+                                                product.id ||
+                                                index
                                             }
                                             style={{
                                                 marginBottom:
                                                     "18px",
                                             }}
                                         >
-
                                             <div
                                                 style={{
                                                     display:
                                                         "flex",
                                                     justifyContent:
                                                         "space-between",
+                                                    gap: "10px",
                                                     marginBottom:
                                                         "7px",
                                                 }}
                                             >
-
                                                 <span>
-                                                    Order #
-                                                    {
-                                                        orderId
-                                                    }
+                                                    {index +
+                                                        1}.{" "}
+                                                    {product.product_name ||
+                                                        product.name ||
+                                                        `Product ${product.product_id}`}
                                                 </span>
 
                                                 <strong>
-                                                    ₹
-                                                    {
-                                                        amount
-                                                    }
+                                                    {amount}
                                                 </strong>
-
                                             </div>
-
 
                                             <div
                                                 style={{
-                                                    width:
-                                                        "100%",
                                                     height:
-                                                        "12px",
+                                                        "8px",
                                                     backgroundColor:
                                                         theme.progressBg,
                                                     borderRadius:
@@ -2832,363 +1432,1059 @@ function AdminDashboard() {
                                                         "hidden",
                                                 }}
                                             >
-
                                                 <div
                                                     style={{
-                                                        width:
-                                                            `${width}%`,
+                                                        width: `${getProductInteractionWidth(
+                                                            amount
+                                                        )}%`,
                                                         height:
                                                             "100%",
                                                         backgroundColor:
-                                                            "#007bff",
+                                                            "#6f42c1",
                                                         borderRadius:
                                                             "10px",
-                                                        transition:
-                                                            "width 0.5s ease",
                                                     }}
                                                 />
-
                                             </div>
-
                                         </div>
-
                                     );
-
                                 }
                             )
-
-                        )
-                    }
-
+                        )}
+                    </div>
                 </div>
 
+                <h2
+                    style={{
+                        marginBottom: "20px",
+                    }}
+                >
+                    Order Status Overview
+                </h2>
 
-                {/* ================================================= */}
-                {/* RECENT ORDERS */}
-                {/* ================================================= */}
-
-                <div>
-
-                    <h2
-                        style={{
-                            marginBottom:
-                                "20px",
-                        }}
-                    >
-                        Recent Orders 📦
-                    </h2>
-
-
-                    {
-                        orders.length === 0 ? (
-
+                <div
+                    style={{
+                        ...cardStyle,
+                        marginBottom: "40px",
+                    }}
+                >
+                    {[
+                        {
+                            label: "Pending",
+                            value: pendingOrders,
+                            percentage:
+                                pendingPercentage,
+                        },
+                        {
+                            label: "Confirmed",
+                            value: confirmedOrders,
+                            percentage:
+                                confirmedPercentage,
+                        },
+                        {
+                            label: "Shipped",
+                            value: shippedOrders,
+                            percentage:
+                                shippedPercentage,
+                        },
+                        {
+                            label: "Delivered",
+                            value: deliveredOrders,
+                            percentage:
+                                deliveredPercentage,
+                        },
+                        {
+                            label: "Cancelled",
+                            value: cancelledOrders,
+                            percentage:
+                                cancelledPercentage,
+                        },
+                    ].map((item) => (
+                        <div
+                            key={item.label}
+                            style={{
+                                marginBottom: "20px",
+                            }}
+                        >
                             <div
                                 style={{
-                                    ...cardStyle,
-                                    textAlign:
-                                        "center",
+                                    display: "flex",
+                                    justifyContent:
+                                        "space-between",
+                                    marginBottom: "7px",
                                 }}
                             >
+                                <span>
+                                    {item.label}
+                                </span>
 
-                                <p>
-                                    No recent orders found.
-                                </p>
-
+                                <strong>
+                                    {item.value} (
+                                    {item.percentage}%)
+                                </strong>
                             </div>
 
-                        ) : (
-
                             <div
                                 style={{
-                                    overflowX:
-                                        "auto",
+                                    height: "8px",
+                                    backgroundColor:
+                                        theme.progressBg,
                                     borderRadius:
-                                        "16px",
+                                        "10px",
+                                    overflow:
+                                        "hidden",
                                 }}
                             >
-
-                                <table
+                                <div
                                     style={{
-                                        width:
-                                            "100%",
-                                        borderCollapse:
-                                            "collapse",
-                                        minWidth:
-                                            "900px",
+                                        width: `${item.percentage}%`,
+                                        height: "100%",
                                         backgroundColor:
-                                            theme.card,
-                                        color:
-                                            theme.text,
+                                            "#007bff",
+                                        borderRadius:
+                                            "10px",
+                                    }}
+                                />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                <h2
+                    style={{
+                        marginBottom: "20px",
+                    }}
+                >
+                    Recent Sales 💰
+                </h2>
+
+                <div
+                    style={{
+                        ...cardStyle,
+                        marginBottom: "40px",
+                    }}
+                >
+                    {orders.length === 0 ? (
+                        <p
+                            style={{
+                                color:
+                                    theme.mutedText,
+                            }}
+                        >
+                            No recent sales available.
+                        </p>
+                    ) : (
+                        orders.map((order) => (
+                            <div
+                                key={order.id}
+                                style={{
+                                    marginBottom:
+                                        "18px",
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        justifyContent:
+                                            "space-between",
+                                        gap: "15px",
+                                        marginBottom:
+                                            "7px",
                                     }}
                                 >
+                                    <span>
+                                        Order #
+                                        {order.id}
+                                    </span>
 
-                                    <thead>
+                                    <strong>
+                                        ₹
+                                        {
+                                            order.total_amount
+                                        }
+                                    </strong>
+                                </div>
 
-                                        <tr>
+                                <div
+                                    style={{
+                                        height: "8px",
+                                        backgroundColor:
+                                            theme.progressBg,
+                                        borderRadius:
+                                            "10px",
+                                        overflow:
+                                            "hidden",
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            width: `${getSalesWidth(
+                                                order.total_amount
+                                            )}%`,
+                                            height: "100%",
+                                            backgroundColor:
+                                                "#28a745",
+                                            borderRadius:
+                                                "10px",
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
 
-                                            {[
-                                                "Order ID",
-                                                "Customer",
-                                                "Email",
-                                                "Amount",
-                                                "Status",
-                                                "Date",
-                                            ].map(
-                                                (
-                                                    heading
-                                                ) => (
+                <div
+                    style={{
+                        display: "flex",
+                        justifyContent:
+                            "space-between",
+                        alignItems: "center",
+                        gap: "15px",
+                        flexWrap: "wrap",
+                        marginBottom: "20px",
+                    }}
+                >
+                    <div>
+                        <h2
+                            style={{
+                                margin: 0,
+                            }}
+                        >
+                            Recent Orders 📦
+                        </h2>
 
-                                                    <th
-                                                        key={
-                                                            heading
-                                                        }
+                        <p
+                            style={{
+                                color:
+                                    theme.secondaryText,
+                                marginTop: "8px",
+                            }}
+                        >
+                            Manage order status and
+                            complete delivery verification.
+                        </p>
+                    </div>
+                </div>
+
+                <div
+                    style={{
+                        overflowX: "auto",
+                        border: `1px solid ${theme.border}`,
+                        borderRadius: "16px",
+                        backgroundColor: theme.card,
+                        boxShadow: theme.shadow,
+                    }}
+                >
+                    <table
+                        style={{
+                            width: "100%",
+                            borderCollapse:
+                                "collapse",
+                            minWidth: "1250px",
+                        }}
+                    >
+                        <thead>
+                            <tr
+                                style={{
+                                    backgroundColor:
+                                        theme.tableHeader,
+                                }}
+                            >
+                                <th style={thStyle}>
+                                    Order
+                                </th>
+
+                                <th style={thStyle}>
+                                    Customer
+                                </th>
+
+                                <th style={thStyle}>
+                                    Amount
+                                </th>
+
+                                <th style={thStyle}>
+                                    Payment
+                                </th>
+
+                                <th style={thStyle}>
+                                    Status
+                                </th>
+
+                                <th style={thStyle}>
+                                    Delivery Verification
+                                </th>
+
+                                <th style={thStyle}>
+                                    Date
+                                </th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            {orders.length === 0 ? (
+                                <tr>
+                                    <td
+                                        colSpan="7"
+                                        style={{
+                                            padding:
+                                                "40px",
+                                            textAlign:
+                                                "center",
+                                            color:
+                                                theme.mutedText,
+                                        }}
+                                    >
+                                        No recent orders
+                                        found.
+                                    </td>
+                                </tr>
+                            ) : (
+                                orders.map((order) => {
+                                    const statusValue =
+                                        order.status ||
+                                        "Pending";
+
+                                    const paymentStatus =
+                                        order.payment_status ||
+                                        "Pending";
+
+                                    const isShipped =
+                                        statusValue ===
+                                        "Shipped";
+
+                                    const isDelivered =
+                                        statusValue ===
+                                        "Delivered";
+
+                                    const otpSent =
+                                        Boolean(
+                                            otpSentOrders[
+                                                order.id
+                                            ]
+                                        );
+
+                                    const isSending =
+                                        sendingOTPOrder ===
+                                        order.id;
+
+                                    const isVerifying =
+                                        verifyingOTPOrder ===
+                                        order.id;
+
+                                    return (
+                                        <tr
+                                            key={
+                                                order.id
+                                            }
+                                            style={{
+                                                borderTop: `1px solid ${theme.border}`,
+                                            }}
+                                        >
+                                            <td
+                                                style={
+                                                    tdStyle
+                                                }
+                                            >
+                                                <strong>
+                                                    #
+                                                    {
+                                                        order.id
+                                                    }
+                                                </strong>
+                                            </td>
+
+                                            <td
+                                                style={
+                                                    tdStyle
+                                                }
+                                            >
+                                                <div
+                                                    style={{
+                                                        fontWeight:
+                                                            "600",
+                                                    }}
+                                                >
+                                                    {order.username ||
+                                                        order.user_name ||
+                                                        order.user?.username ||
+                                                        "Customer"}
+                                                </div>
+
+                                                <div
+                                                    style={{
+                                                        color:
+                                                            theme.mutedText,
+                                                        fontSize:
+                                                            "12px",
+                                                        marginTop:
+                                                            "4px",
+                                                    }}
+                                                >
+                                                    {order.city ||
+                                                        ""}
+                                                </div>
+                                            </td>
+
+                                            <td
+                                                style={
+                                                    tdStyle
+                                                }
+                                            >
+                                                <strong>
+                                                    ₹
+                                                    {
+                                                        order.total_amount
+                                                    }
+                                                </strong>
+                                            </td>
+
+                                            <td
+                                                style={
+                                                    tdStyle
+                                                }
+                                            >
+                                                <span
+                                                    style={{
+                                                        ...getStatusStyle(
+                                                            paymentStatus ===
+                                                                "Success"
+                                                                ? "Delivered"
+                                                                : paymentStatus
+                                                        ),
+                                                        padding:
+                                                            "6px 10px",
+                                                        borderRadius:
+                                                            "20px",
+                                                        fontSize:
+                                                            "12px",
+                                                        fontWeight:
+                                                            "600",
+                                                    }}
+                                                >
+                                                    {paymentStatus}
+                                                </span>
+                                            </td>
+
+                                            <td
+                                                style={
+                                                    tdStyle
+                                                }
+                                            >
+                                                {isDelivered ? (
+                                                    <span
                                                         style={{
-                                                            border:
-                                                                `1px solid ${theme.border}`,
+                                                            ...getStatusStyle(
+                                                                "Delivered"
+                                                            ),
                                                             padding:
+                                                                "7px 12px",
+                                                            borderRadius:
+                                                                "20px",
+                                                            fontWeight:
+                                                                "700",
+                                                            fontSize:
                                                                 "12px",
-                                                            textAlign:
-                                                                "left",
-                                                            backgroundColor:
-                                                                theme.tableHeader,
-                                                            color:
-                                                                theme.text,
                                                         }}
                                                     >
-                                                        {
-                                                            heading
+                                                        Delivered
+                                                    </span>
+                                                ) : (
+                                                    <select
+                                                        value={
+                                                            statusValue
                                                         }
-                                                    </th>
-
-                                                )
-                                            )}
-
-                                        </tr>
-
-                                    </thead>
-
-
-                                    <tbody>
-
-                                        {
-                                            orders.map(
-                                                (
-                                                    order
-                                                ) => {
-
-                                                    const orderId =
-                                                        order.order_id ||
-                                                        order.id;
-
-
-                                                    const customer =
-                                                        order.customer ||
-                                                        order.username ||
-                                                        order.user ||
-                                                        "-";
-
-
-                                                    const email =
-                                                        order.email ||
-                                                        "-";
-
-
-                                                    return (
-
-                                                        <tr
-                                                            key={
-                                                                orderId
-                                                            }
-                                                            onMouseEnter={(
+                                                        disabled={
+                                                            updatingOrder ===
+                                                            order.id
+                                                        }
+                                                        onChange={(
+                                                            event
+                                                        ) =>
+                                                            handleStatusChange(
+                                                                order.id,
                                                                 event
-                                                            ) => {
-                                                                event.currentTarget.style.backgroundColor =
-                                                                    theme.tableHover;
-                                                            }}
-                                                            onMouseLeave={(
-                                                                event
-                                                            ) => {
-                                                                event.currentTarget.style.backgroundColor =
-                                                                    "transparent";
+                                                                    .target
+                                                                    .value
+                                                            )
+                                                        }
+                                                        style={{
+                                                            padding:
+                                                                "9px 12px",
+                                                            border: `1px solid ${theme.border}`,
+                                                            borderRadius:
+                                                                "8px",
+                                                            backgroundColor:
+                                                                theme.input,
+                                                            color:
+                                                                theme.text,
+                                                            cursor:
+                                                                "pointer",
+                                                        }}
+                                                    >
+                                                        <option value="Pending">
+                                                            Pending
+                                                        </option>
+                                                        <option value="Confirmed">
+                                                            Confirmed
+                                                        </option>
+                                                        <option value="Shipped">
+                                                            Shipped
+                                                        </option>
+                                                        <option value="Cancelled">
+                                                            Cancelled
+                                                        </option>
+                                                    </select>
+                                                )}
+                                            </td>
+
+                                            <td
+                                                style={{
+                                                    ...tdStyle,
+                                                    minWidth:
+                                                        "390px",
+                                                }}
+                                            >
+                                                {isShipped && (
+                                                    <div
+                                                        style={{
+                                                            display:
+                                                                "flex",
+                                                            flexDirection:
+                                                                "column",
+                                                            gap: "10px",
+                                                        }}
+                                                    >
+                                                        <div
+                                                            style={{
+                                                                display:
+                                                                    "flex",
+                                                                gap: "8px",
+                                                                flexWrap:
+                                                                    "wrap",
                                                             }}
                                                         >
-
-                                                            <td
-                                                                style={{
-                                                                    border:
-                                                                        `1px solid ${theme.border}`,
-                                                                    padding:
-                                                                        "12px",
-                                                                }}
-                                                            >
-                                                                #
-                                                                {
-                                                                    orderId
+                                                            <input
+                                                                type="tel"
+                                                                value={
+                                                                    deliveryPhones[
+                                                                        order.id
+                                                                    ] ||
+                                                                    ""
                                                                 }
-                                                            </td>
-
-
-                                                            <td
-                                                                style={{
-                                                                    border:
-                                                                        `1px solid ${theme.border}`,
-                                                                    padding:
-                                                                        "12px",
-                                                                }}
-                                                            >
-                                                                {
-                                                                    customer
+                                                                onChange={(
+                                                                    event
+                                                                ) =>
+                                                                    setDeliveryPhones(
+                                                                        (
+                                                                            previous
+                                                                        ) => ({
+                                                                            ...previous,
+                                                                            [order.id]:
+                                                                                event
+                                                                                    .target
+                                                                                    .value,
+                                                                        })
+                                                                    )
                                                                 }
-                                                            </td>
-
-
-                                                            <td
-                                                                style={{
-                                                                    border:
-                                                                        `1px solid ${theme.border}`,
-                                                                    padding:
-                                                                        "12px",
-                                                                }}
-                                                            >
-                                                                {
-                                                                    email
+                                                                placeholder="Enter customer phone"
+                                                                maxLength={
+                                                                    15
                                                                 }
-                                                            </td>
-
-
-                                                            <td
+                                                                disabled={
+                                                                    isSending ||
+                                                                    isVerifying
+                                                                }
                                                                 style={{
-                                                                    border:
-                                                                        `1px solid ${theme.border}`,
+                                                                    flex:
+                                                                        "1",
+                                                                    minWidth:
+                                                                        "190px",
                                                                     padding:
-                                                                        "12px",
+                                                                        "9px 10px",
+                                                                    border: `1px solid ${theme.border}`,
+                                                                    borderRadius:
+                                                                        "8px",
+                                                                    backgroundColor:
+                                                                        theme.input,
+                                                                    color:
+                                                                        theme.text,
+                                                                    outline:
+                                                                        "none",
+                                                                }}
+                                                            />
+
+                                                            <button
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    handleSendDeliveryOTP(
+                                                                        order.id
+                                                                    )
+                                                                }
+                                                                disabled={
+                                                                    isSending ||
+                                                                    isVerifying
+                                                                }
+                                                                style={{
+                                                                    padding:
+                                                                        "9px 14px",
+                                                                    border:
+                                                                        "none",
+                                                                    borderRadius:
+                                                                        "8px",
+                                                                    backgroundColor:
+                                                                        isSending
+                                                                            ? "#94a3b8"
+                                                                            : "#007bff",
+                                                                    color:
+                                                                        "#fff",
+                                                                    cursor:
+                                                                        isSending
+                                                                            ? "not-allowed"
+                                                                            : "pointer",
                                                                     fontWeight:
                                                                         "600",
+                                                                    whiteSpace:
+                                                                        "nowrap",
                                                                 }}
                                                             >
-                                                                ₹
-                                                                {
-                                                                    order.total_amount ??
-                                                                    0
-                                                                }
-                                                            </td>
+                                                                {isSending
+                                                                    ? "Sending..."
+                                                                    : otpSent
+                                                                    ? "Resend OTP"
+                                                                    : "Send OTP"}
+                                                            </button>
+                                                        </div>
 
-
-                                                            <td
+                                                        {otpSent && (
+                                                            <div
                                                                 style={{
-                                                                    border:
-                                                                        `1px solid ${theme.border}`,
-                                                                    padding:
-                                                                        "12px",
+                                                                    display:
+                                                                        "flex",
+                                                                    gap: "8px",
+                                                                    flexWrap:
+                                                                        "wrap",
                                                                 }}
                                                             >
-
-                                                                <select
+                                                                <input
+                                                                    type="text"
+                                                                    inputMode="numeric"
                                                                     value={
-                                                                        order.status ||
-                                                                        "Pending"
-                                                                    }
-                                                                    disabled={
-                                                                        updatingOrder ===
-                                                                        orderId
+                                                                        otpInputs[
+                                                                            order.id
+                                                                        ] ||
+                                                                        ""
                                                                     }
                                                                     onChange={(
                                                                         event
                                                                     ) =>
-                                                                        handleStatusChange(
-                                                                            orderId,
-                                                                            event.target.value
+                                                                        setOtpInputs(
+                                                                            (
+                                                                                previous
+                                                                            ) => ({
+                                                                                ...previous,
+                                                                                [order.id]:
+                                                                                    event
+                                                                                        .target
+                                                                                        .value
+                                                                                        .replace(
+                                                                                            /\D/g,
+                                                                                            ""
+                                                                                        )
+                                                                                        .slice(
+                                                                                            0,
+                                                                                            6
+                                                                                        ),
+                                                                            })
                                                                         )
                                                                     }
+                                                                    placeholder="Enter 6-digit OTP"
+                                                                    maxLength={
+                                                                        6
+                                                                    }
+                                                                    disabled={
+                                                                        isVerifying
+                                                                    }
                                                                     style={{
+                                                                        flex:
+                                                                            "1",
+                                                                        minWidth:
+                                                                            "190px",
                                                                         padding:
-                                                                            "8px 10px",
+                                                                            "9px 10px",
+                                                                        border: `1px solid ${theme.border}`,
                                                                         borderRadius:
-                                                                            "7px",
-                                                                        border:
-                                                                            `1px solid ${theme.border}`,
+                                                                            "8px",
                                                                         backgroundColor:
                                                                             theme.input,
                                                                         color:
                                                                             theme.text,
+                                                                        outline:
+                                                                            "none",
+                                                                    }}
+                                                                />
+
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        handleVerifyDeliveryOTP(
+                                                                            order.id
+                                                                        )
+                                                                    }
+                                                                    disabled={
+                                                                        isVerifying
+                                                                    }
+                                                                    style={{
+                                                                        padding:
+                                                                            "9px 14px",
+                                                                        border:
+                                                                            "none",
+                                                                        borderRadius:
+                                                                            "8px",
+                                                                        backgroundColor:
+                                                                            isVerifying
+                                                                                ? "#94a3b8"
+                                                                                : "#16a34a",
+                                                                        color:
+                                                                            "#fff",
                                                                         cursor:
-                                                                            updatingOrder ===
-                                                                            orderId
+                                                                            isVerifying
                                                                                 ? "not-allowed"
                                                                                 : "pointer",
+                                                                        fontWeight:
+                                                                            "600",
+                                                                        whiteSpace:
+                                                                            "nowrap",
                                                                     }}
                                                                 >
+                                                                    {isVerifying
+                                                                        ? "Verifying..."
+                                                                        : "Verify OTP"}
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
 
-                                                                    <option value="Pending">
-                                                                        Pending
-                                                                    </option>
+                                                {isDelivered && (
+                                                    <div>
+                                                        <div
+                                                            style={{
+                                                                color:
+                                                                    "#16a34a",
+                                                                fontWeight:
+                                                                    "700",
+                                                                marginBottom:
+                                                                    "5px",
+                                                            }}
+                                                        >
+                                                            ✓ Delivery
+                                                            Verified
+                                                        </div>
 
-                                                                    <option value="Confirmed">
-                                                                        Confirmed
-                                                                    </option>
-
-                                                                    <option value="Shipped">
-                                                                        Shipped
-                                                                    </option>
-
-                                                                    <option value="Delivered">
-                                                                        Delivered
-                                                                    </option>
-
-                                                                    <option value="Cancelled">
-                                                                        Cancelled
-                                                                    </option>
-
-                                                                </select>
-
-                                                            </td>
-
-
-                                                            <td
+                                                        {order.delivered_at && (
+                                                            <div
                                                                 style={{
-                                                                    border:
-                                                                        `1px solid ${theme.border}`,
-                                                                    padding:
+                                                                    color:
+                                                                        theme.mutedText,
+                                                                    fontSize:
                                                                         "12px",
                                                                 }}
                                                             >
+                                                                {new Date(
+                                                                    order.delivered_at
+                                                                ).toLocaleString()}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
 
-                                                                {
-                                                                    order.created_at
-                                                                        ? new Date(
-                                                                            order.created_at
-                                                                        ).toLocaleString()
-                                                                        : "-"
-                                                                }
+                                                {!isShipped &&
+                                                    !isDelivered && (
+                                                        <span
+                                                            style={{
+                                                                color:
+                                                                    theme.mutedText,
+                                                                fontSize:
+                                                                    "13px",
+                                                            }}
+                                                        >
+                                                            Available after
+                                                            shipping
+                                                        </span>
+                                                    )}
+                                            </td>
 
-                                                            </td>
-
-                                                        </tr>
-
-                                                    );
-
+                                            <td
+                                                style={
+                                                    tdStyle
                                                 }
-                                            )
-                                        }
-
-                                    </tbody>
-
-                                </table>
-
-                            </div>
-
-                        )
-                    }
-
+                                            >
+                                                <span
+                                                    style={{
+                                                        color:
+                                                            theme.secondaryText,
+                                                        fontSize:
+                                                            "13px",
+                                                    }}
+                                                >
+                                                    {order.created_at
+                                                        ? new Date(
+                                                              order.created_at
+                                                          ).toLocaleString()
+                                                        : "-"}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
+                            )}
+                        </tbody>
+                    </table>
                 </div>
-
             </div>
 
+            <section
+                style={{
+                    marginTop: "34px",
+                    padding: "24px",
+                    border: `1px solid ${theme.border}`,
+                    borderRadius: "12px",
+                    backgroundColor: theme.card,
+                    boxShadow: theme.shadow,
+                }}
+            >
+                <div
+                    style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "baseline",
+                        gap: "12px",
+                        flexWrap: "wrap",
+                        marginBottom: "20px",
+                    }}
+                >
+                    <div>
+                        <h2 style={{ margin: 0 }}>Delivery issue review</h2>
+                        <p style={{ color: theme.secondaryText }}>
+                            Compare customer evidence with the catalog image before deciding.
+                        </p>
+                    </div>
+                    <strong>
+                        {deliveryClaims.filter((claim) => claim.status === "pending").length} pending
+                    </strong>
+                </div>
+
+                {deliveryClaims.length === 0 ? (
+                    <p style={{ color: theme.mutedText }}>
+                        No delivery issue reports have been submitted.
+                    </p>
+                ) : (
+                    deliveryClaims.map((claim) => {
+                        const defaultRefundDate = new Date();
+                        defaultRefundDate.setDate(defaultRefundDate.getDate() + 7);
+
+                        return (
+                            <article
+                                key={claim.id}
+                                style={{
+                                    padding: "20px 0",
+                                    borderTop: `1px solid ${theme.border}`,
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        gap: "16px",
+                                        flexWrap: "wrap",
+                                    }}
+                                >
+                                    <div>
+                                        <strong>
+                                            Order #{claim.order} · {claim.order_item_name}
+                                        </strong>
+                                        <div style={{ color: theme.secondaryText, marginTop: "5px" }}>
+                                            {claim.customer_name} · {claim.issue_type.replace("_", " ")}
+                                            {claim.created_at &&
+                                                ` · ${new Date(claim.created_at).toLocaleString()}`}
+                                        </div>
+                                    </div>
+                                    <strong style={{ textTransform: "capitalize" }}>
+                                        {claim.status.replace("_", " ")}
+                                    </strong>
+                                </div>
+
+                                {claim.description && (
+                                    <p style={{ color: theme.secondaryText }}>
+                                        {claim.description}
+                                    </p>
+                                )}
+
+                                <div
+                                    style={{
+                                        display: "grid",
+                                        gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                                        gap: "16px",
+                                        marginTop: "14px",
+                                    }}
+                                >
+                                    {[
+                                        ["Catalog image", claim.product_image],
+                                        ["Customer evidence", claim.evidence_image],
+                                    ].map(([label, imageUrl]) => (
+                                        <div key={label}>
+                                            <div style={{ color: theme.mutedText, marginBottom: "6px" }}>
+                                                {label}
+                                            </div>
+                                            {imageUrl ? (
+                                                <img
+                                                    src={imageUrl}
+                                                    alt={`${label} for order ${claim.order}`}
+                                                    style={{
+                                                        display: "block",
+                                                        width: "100%",
+                                                        height: "220px",
+                                                        objectFit: "contain",
+                                                        background: theme.input,
+                                                        border: `1px solid ${theme.border}`,
+                                                        borderRadius: "6px",
+                                                    }}
+                                                />
+                                            ) : (
+                                                <div style={{ color: theme.mutedText }}>
+                                                    Image unavailable
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div
+                                    style={{
+                                        marginTop: "14px",
+                                        padding: "12px",
+                                        background: theme.tableHeader,
+                                        borderRadius: "6px",
+                                    }}
+                                >
+                                    <strong>
+                                        Image analysis · {claim.ai_analysis?.provider || "manual"}
+                                    </strong>
+                                    <p style={{ marginBottom: "4px", color: theme.secondaryText }}>
+                                        {claim.ai_analysis?.summary || "No automatic analysis is available."}
+                                    </p>
+                                    {claim.visual_similarity !== null &&
+                                        claim.visual_similarity !== undefined && (
+                                            <span style={{ color: theme.mutedText }}>
+                                                Local image similarity: {claim.visual_similarity}%
+                                            </span>
+                                        )}
+                                </div>
+
+                                {claim.status === "pending" ? (
+                                    <div
+                                        style={{
+                                            display: "grid",
+                                            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                                            gap: "12px",
+                                            marginTop: "16px",
+                                            alignItems: "end",
+                                        }}
+                                    >
+                                        <label>
+                                            Refund processing date
+                                            <input
+                                                type="date"
+                                                min={new Date().toISOString().slice(0, 10)}
+                                                value={
+                                                    refundDates[claim.id] ||
+                                                    defaultRefundDate.toISOString().slice(0, 10)
+                                                }
+                                                onChange={(event) =>
+                                                    setRefundDates((previous) => ({
+                                                        ...previous,
+                                                        [claim.id]: event.target.value,
+                                                    }))
+                                                }
+                                                style={{
+                                                    display: "block",
+                                                    width: "100%",
+                                                    marginTop: "5px",
+                                                    padding: "9px",
+                                                    border: `1px solid ${theme.border}`,
+                                                    borderRadius: "6px",
+                                                    background: theme.input,
+                                                    color: theme.text,
+                                                }}
+                                            />
+                                        </label>
+                                        <label>
+                                            Review note
+                                            <textarea
+                                                value={claimNotes[claim.id] || ""}
+                                                onChange={(event) =>
+                                                    setClaimNotes((previous) => ({
+                                                        ...previous,
+                                                        [claim.id]: event.target.value,
+                                                    }))
+                                                }
+                                                rows={2}
+                                                maxLength={2000}
+                                                style={{
+                                                    display: "block",
+                                                    width: "100%",
+                                                    marginTop: "5px",
+                                                    padding: "9px",
+                                                    border: `1px solid ${theme.border}`,
+                                                    borderRadius: "6px",
+                                                    background: theme.input,
+                                                    color: theme.text,
+                                                }}
+                                            />
+                                        </label>
+                                        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                                            <button
+                                                type="button"
+                                                disabled={reviewingClaim === claim.id}
+                                                onClick={() => handleReviewDeliveryClaim(claim, "approved")}
+                                            >
+                                                Approve refund
+                                            </button>
+                                            <button
+                                                type="button"
+                                                disabled={reviewingClaim === claim.id}
+                                                onClick={() => handleReviewDeliveryClaim(claim, "rejected")}
+                                            >
+                                                Reject report
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <p style={{ color: theme.secondaryText }}>
+                                        {claim.customer_message}
+                                    </p>
+                                )}
+                            </article>
+                        );
+                    })
+                )}
+            </section>
         </div>
-
     );
-
 }
 
+const thStyle = {
+    padding: "15px 14px",
+    textAlign: "left",
+    fontSize: "13px",
+    fontWeight: "700",
+    whiteSpace: "nowrap",
+};
+
+const tdStyle = {
+    padding: "15px 14px",
+    verticalAlign: "top",
+};
 
 export default AdminDashboard;

@@ -16,6 +16,7 @@ venv/
 
 # Django generated files
 backend/media/invoices/
+backend/media/delivery-claims/
 *.sqlite3
 
 # Frontend dependencies and build output

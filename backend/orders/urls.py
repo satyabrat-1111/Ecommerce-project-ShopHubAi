@@ -8,6 +8,11 @@ from .views import (
     AdminAnalyticsView,
     AdminRecentOrdersView,
     AdminOrderStatusUpdateView,
+    DeliveryOTPSendView,
+    DeliveryOTPVerificationView,
+    DeliveryIssueClaimsView,
+    AdminDeliveryIssueClaimsView,
+    AdminDeliveryIssueReviewView,
 )
 
 
@@ -33,6 +38,41 @@ urlpatterns = [
         "<int:id>/",
         OrderDetailView.as_view(),
         name="order-detail",
+    ),
+
+
+    # =====================================
+    # DELIVERY OTP
+    # =====================================
+
+    path(
+        "<int:order_id>/delivery/send-otp/",
+        DeliveryOTPSendView.as_view(),
+        name="delivery-send-otp",
+    ),
+
+    path(
+        "<int:order_id>/delivery/verify-otp/",
+        DeliveryOTPVerificationView.as_view(),
+        name="delivery-verify-otp",
+    ),
+
+    path(
+        "<int:order_id>/claims/",
+        DeliveryIssueClaimsView.as_view(),
+        name="delivery-issue-claims",
+    ),
+
+    path(
+        "admin/delivery-claims/",
+        AdminDeliveryIssueClaimsView.as_view(),
+        name="admin-delivery-issue-claims",
+    ),
+
+    path(
+        "admin/delivery-claims/<int:claim_id>/review/",
+        AdminDeliveryIssueReviewView.as_view(),
+        name="admin-delivery-issue-review",
     ),
 
 

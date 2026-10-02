@@ -4,6 +4,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import {
 getOrderDetail,
 downloadInvoice,
+getDeliveryIssueClaims,
+createDeliveryIssueClaim,
 } from "../services/orderApi";
 
 function OrderDetails() {
@@ -16,6 +18,13 @@ const [loading, setLoading] = useState(true);
 const [error, setError] = useState("");
 const [invoiceLoading, setInvoiceLoading] = useState(false);
 const [invoiceMessage, setInvoiceMessage] = useState("");
+const [claims, setClaims] = useState([]);
+const [activeClaimItem, setActiveClaimItem] = useState(null);
+const [claimIssueType, setClaimIssueType] = useState("damaged");
+const [claimDescription, setClaimDescription] = useState("");
+const [claimImage, setClaimImage] = useState(null);
+const [claimSubmitting, setClaimSubmitting] = useState(false);
+const [claimError, setClaimError] = useState("");
 
 
 // =====================================
@@ -40,6 +49,16 @@ useEffect(() => {
             );
 
             setOrder(data);
+
+            try {
+                const issueClaims = await getDeliveryIssueClaims(id);
+                setClaims(issueClaims);
+            } catch (claimLoadError) {
+                console.error(
+                    "Delivery Issue Claims Error:",
+                    claimLoadError
+                );
+            }
 
         } catch (error) {
 
@@ -119,6 +138,38 @@ const handleDownloadInvoice = async () => {
 
         setInvoiceLoading(false);
 
+    }
+};
+
+
+const handleSubmitDeliveryClaim = async (event, itemId) => {
+    event.preventDefault();
+
+    if (!claimImage) {
+        setClaimError("Choose a photo of the item you received.");
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append("order_item_id", String(itemId));
+    formData.append("issue_type", claimIssueType);
+    formData.append("description", claimDescription);
+    formData.append("evidence_image", claimImage);
+
+    try {
+        setClaimSubmitting(true);
+        setClaimError("");
+        const claim = await createDeliveryIssueClaim(id, formData);
+        setClaims((previous) => [claim, ...previous]);
+        setActiveClaimItem(null);
+        setClaimDescription("");
+        setClaimImage(null);
+    } catch (submitError) {
+        setClaimError(
+            submitError.message || "Unable to submit the delivery issue report."
+        );
+    } finally {
+        setClaimSubmitting(false);
     }
 };
 
@@ -703,6 +754,149 @@ return (
                                                 Quantity:{" "}
                                                 {item.quantity}
                                             </p>
+
+                                            {orderStatus === "Delivered" && (() => {
+                                                const itemClaim = claims.find(
+                                                    (claim) =>
+                                                        Number(claim.order_item) ===
+                                                        Number(item.id)
+                                                );
+
+                                                if (itemClaim) {
+                                                    return (
+                                                        <div
+                                                            style={{
+                                                                marginTop: "12px",
+                                                                padding: "12px",
+                                                                border: "1px solid #d1d5db",
+                                                                borderRadius: "8px",
+                                                            }}
+                                                        >
+                                                            <strong>
+                                                                Issue report: {itemClaim.status.replace("_", " ")}
+                                                            </strong>
+                                                            {itemClaim.customer_message && (
+                                                                <p>{itemClaim.customer_message}</p>
+                                                            )}
+                                                            {!itemClaim.customer_message && (
+                                                                <p>
+                                                                    {itemClaim.ai_analysis?.summary ||
+                                                                        "Your report is waiting for admin review."}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                }
+
+                                                if (activeClaimItem === item.id) {
+                                                    return (
+                                                        <form
+                                                            onSubmit={(event) =>
+                                                                handleSubmitDeliveryClaim(event, item.id)
+                                                            }
+                                                            style={{
+                                                                display: "grid",
+                                                                gap: "8px",
+                                                                marginTop: "12px",
+                                                                maxWidth: "420px",
+                                                            }}
+                                                        >
+                                                            <label>
+                                                                Issue type
+                                                                <select
+                                                                    value={claimIssueType}
+                                                                    onChange={(event) =>
+                                                                        setClaimIssueType(event.target.value)
+                                                                    }
+                                                                    style={{
+                                                                        display: "block",
+                                                                        width: "100%",
+                                                                        padding: "9px",
+                                                                        marginTop: "4px",
+                                                                    }}
+                                                                >
+                                                                    <option value="damaged">Damaged</option>
+                                                                    <option value="broken">Broken</option>
+                                                                    <option value="wrong_product">Wrong product</option>
+                                                                    <option value="other">Other issue</option>
+                                                                </select>
+                                                            </label>
+                                                            <label>
+                                                                Photo of the received item
+                                                                <input
+                                                                    type="file"
+                                                                    accept="image/jpeg,image/png,image/webp"
+                                                                    onChange={(event) =>
+                                                                        setClaimImage(event.target.files?.[0] || null)
+                                                                    }
+                                                                    required
+                                                                    style={{
+                                                                        display: "block",
+                                                                        width: "100%",
+                                                                        marginTop: "4px",
+                                                                    }}
+                                                                />
+                                                            </label>
+                                                            <label>
+                                                                Details (optional)
+                                                                <textarea
+                                                                    value={claimDescription}
+                                                                    onChange={(event) =>
+                                                                        setClaimDescription(event.target.value)
+                                                                    }
+                                                                    maxLength={2000}
+                                                                    rows={3}
+                                                                    style={{
+                                                                        display: "block",
+                                                                        width: "100%",
+                                                                        padding: "9px",
+                                                                        marginTop: "4px",
+                                                                    }}
+                                                                />
+                                                            </label>
+                                                            {claimError && (
+                                                                <p role="alert" style={{ color: "#b91c1c" }}>
+                                                                    {claimError}
+                                                                </p>
+                                                            )}
+                                                            <div style={{ display: "flex", gap: "8px" }}>
+                                                                <button
+                                                                    type="submit"
+                                                                    className="primary-order-button"
+                                                                    disabled={claimSubmitting}
+                                                                >
+                                                                    {claimSubmitting ? "Submitting..." : "Submit report"}
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    className="secondary-order-button"
+                                                                    onClick={() => {
+                                                                        setActiveClaimItem(null);
+                                                                        setClaimError("");
+                                                                    }}
+                                                                >
+                                                                    Cancel
+                                                                </button>
+                                                            </div>
+                                                        </form>
+                                                    );
+                                                }
+
+                                                return (
+                                                    <button
+                                                        type="button"
+                                                        className="secondary-order-button"
+                                                        onClick={() => {
+                                                            setClaimIssueType("damaged");
+                                                            setClaimError("");
+                                                            setActiveClaimItem(item.id);
+                                                        }}
+                                                        style={{ marginTop: "10px" }}
+                                                    >
+                                                        Report a delivery issue
+                                                    </button>
+                                                );
+                                            })()}
 
                                         </div>
 

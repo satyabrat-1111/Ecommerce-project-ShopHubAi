@@ -9,6 +9,28 @@ import {
 
 import "../styles/Checkout.css";
 
+const ensureRazorpayLoaded = () => {
+    if (window.Razorpay) {
+        return Promise.resolve(true);
+    }
+
+    return new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = "https://checkout.razorpay.com/v1/checkout.js";
+        script.async = true;
+        script.onload = () => {
+            if (window.Razorpay) {
+                resolve(true);
+            } else {
+                reject(new Error("Razorpay Checkout could not be initialized. Please refresh and try again."));
+            }
+        };
+        script.onerror = () => {
+            reject(new Error("Unable to load Razorpay Checkout. Check your internet connection and try again."));
+        };
+        document.head.appendChild(script);
+    });
+};
 
 function Checkout() {
 
@@ -25,8 +47,6 @@ function Checkout() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
-
-    // HANDLE INPUT
     const handleChange = (event) => {
         const { name, value } = event.target;
 
@@ -35,14 +55,11 @@ function Checkout() {
             [name]: value,
         }));
 
-        // Clear error while user is correcting input
         if (error) {
             setError("");
         }
     };
 
-
-    // OPEN RAZORPAY
     const openRazorpay = async (order) => {
         try {
             console.log("Creating Razorpay Payment...");
@@ -54,11 +71,7 @@ function Checkout() {
                 payment
             );
 
-            if (typeof window.Razorpay === "undefined") {
-                throw new Error(
-                    "Razorpay Checkout script is not loaded."
-                );
-            }
+            await ensureRazorpayLoaded();
 
             const options = {
                 key: payment.razorpay_key_id,
@@ -202,15 +215,12 @@ function Checkout() {
         }
     };
 
-
-    // PLACE ORDER
     const handleSubmit = async (event) => {
 
         event.preventDefault();
 
         setError("");
 
-        // Required field validation
         if (
             !formData.shipping_address.trim() ||
             !formData.city.trim() ||
@@ -225,7 +235,6 @@ function Checkout() {
             return;
         }
 
-        // Pincode validation
         if (
             !/^\d{6}$/.test(
                 formData.pincode
@@ -248,7 +257,6 @@ function Checkout() {
                 formData
             );
 
-            // STEP 1: CREATE ORDER
             const order =
                 await placeOrder(
                     formData
@@ -259,7 +267,6 @@ function Checkout() {
                 order
             );
 
-            // STEP 2: CREATE PAYMENT + OPEN RAZORPAY
             await openRazorpay(
                 order
             );
@@ -280,12 +287,9 @@ function Checkout() {
         }
     };
 
-
     return (
 
         <div className="checkout-page">
-
-            {/* HEADER */}
 
             <div className="checkout-header">
 
@@ -330,15 +334,9 @@ function Checkout() {
 
             </div>
 
-
-            {/* MAIN */}
-
             <main className="checkout-container">
 
                 <div className="checkout-layout">
-
-
-                    {/* LEFT - DELIVERY */}
 
                     <section className="checkout-card">
 
@@ -363,7 +361,6 @@ function Checkout() {
 
                         </div>
 
-
                         {error && (
 
                             <div className="checkout-error">
@@ -386,14 +383,10 @@ function Checkout() {
 
                         )}
 
-
                         <form
                             onSubmit={handleSubmit}
                             className="checkout-form"
                         >
-
-
-                            {/* ADDRESS */}
 
                             <div className="form-group">
 
@@ -424,9 +417,6 @@ function Checkout() {
 
                             </div>
 
-
-                            {/* CITY + STATE */}
-
                             <div className="form-row">
 
                                 <div className="form-group">
@@ -452,7 +442,6 @@ function Checkout() {
                                     />
 
                                 </div>
-
 
                                 <div className="form-group">
 
@@ -480,9 +469,6 @@ function Checkout() {
 
                             </div>
 
-
-                            {/* COUNTRY + PINCODE */}
-
                             <div className="form-row">
 
                                 <div className="form-group">
@@ -506,7 +492,6 @@ function Checkout() {
                                     />
 
                                 </div>
-
 
                                 <div className="form-group">
 
@@ -559,9 +544,6 @@ function Checkout() {
 
                             </div>
 
-
-                            {/* PAYMENT INFO */}
-
                             <div className="payment-info">
 
                                 <div className="payment-info-icon">
@@ -604,9 +586,6 @@ function Checkout() {
 
                             </div>
 
-
-                            {/* SUBMIT */}
-
                             <button
                                 type="submit"
                                 className="checkout-button"
@@ -634,7 +613,6 @@ function Checkout() {
 
                             </button>
 
-
                             <p className="checkout-note">
                                 🔒 Your payment details are securely
                                 processed by Razorpay.
@@ -644,18 +622,13 @@ function Checkout() {
 
                     </section>
 
-
-                    {/* RIGHT - CHECKOUT STEPS */}
-
                     <aside className="checkout-sidebar">
-
 
                         <div className="progress-card">
 
                             <h3>
                                 Checkout Progress
                             </h3>
-
 
                             <div className="progress-step active">
 
@@ -675,9 +648,7 @@ function Checkout() {
 
                             </div>
 
-
                             <div className="progress-line"></div>
-
 
                             <div className="progress-step">
 
@@ -697,9 +668,7 @@ function Checkout() {
 
                             </div>
 
-
                             <div className="progress-line"></div>
-
 
                             <div className="progress-step">
 
@@ -720,7 +689,6 @@ function Checkout() {
                             </div>
 
                         </div>
-
 
                         <div className="trust-card">
 
@@ -743,7 +711,6 @@ function Checkout() {
 
                             </div>
 
-
                             <div className="trust-item">
 
                                 <span>
@@ -762,7 +729,6 @@ function Checkout() {
                                 </div>
 
                             </div>
-
 
                             <div className="trust-item">
 
