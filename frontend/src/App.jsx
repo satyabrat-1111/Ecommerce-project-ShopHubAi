@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, Routes, Route, useNavigate } from "react-router-dom";
+import { Link, Routes, Route, useLocation, useNavigate } from "react-router-dom";
 
 // =====================================
 // PAGES
@@ -27,6 +27,10 @@ import PaymentHistory from "./pages/PaymentHistory";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminProtectedRoute from "./pages/AdminProtectedRoute";
 import AdminProducts from "./pages/AdminProducts";
+import BusinessAnalytics from "./pages/BusinessAnalytics";
+import CustomerInsights from "./pages/CustomerInsights";
+import DeliveryPersonTracking from "./pages/DeliveryPersonTracking";
+import AdminDeliveryTracking from "./pages/AdminDeliveryTracking";
 // =====================================
 // CSS
 // =====================================
@@ -49,6 +53,9 @@ function Navbar({ darkMode, setDarkMode }) {
     const [isAdmin, setIsAdmin] = useState(
         localStorage.getItem("is_admin") === "true"
     );
+    const [isDeliveryPerson, setIsDeliveryPerson] = useState(
+        localStorage.getItem("is_delivery_person") === "true"
+    );
 
 
     // =====================================
@@ -66,6 +73,9 @@ function Navbar({ darkMode, setDarkMode }) {
             setIsAdmin(
                 localStorage.getItem("is_admin") === "true"
             );
+            setIsDeliveryPerson(
+                localStorage.getItem("is_delivery_person") === "true"
+            );
         };
 
         checkLogin();
@@ -74,12 +84,14 @@ function Navbar({ darkMode, setDarkMode }) {
             "storage",
             checkLogin
         );
+        window.addEventListener("auth-updated", checkLogin);
 
         return () => {
             window.removeEventListener(
                 "storage",
                 checkLogin
             );
+            window.removeEventListener("auth-updated", checkLogin);
         };
 
     }, []);
@@ -89,14 +101,20 @@ function Navbar({ darkMode, setDarkMode }) {
     // LOGOUT
     // =====================================
 
-    const handleLogout = () => {
-
+    const clearAuthState = () => {
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");
         localStorage.removeItem("is_admin");
+        localStorage.removeItem("is_delivery_person");
+        window.dispatchEvent(new Event("auth-updated"));
+    };
+
+    const handleLogout = () => {
+        clearAuthState();
 
         setIsLoggedIn(false);
         setIsAdmin(false);
+        setIsDeliveryPerson(false);
 
         navigate("/login");
     };
@@ -149,6 +167,12 @@ function Navbar({ darkMode, setDarkMode }) {
                 )}
 
                 {isLoggedIn && (
+                    <Link to="/insights">
+                        My Insights
+                    </Link>
+                )}
+
+                {isLoggedIn && (
                     <Link to="/payments">
                         💳 Payments
                     </Link>
@@ -162,6 +186,24 @@ function Navbar({ darkMode, setDarkMode }) {
                 {isAdmin && (
                     <Link to="/admin">
                         📊 Admin
+                    </Link>
+                )}
+
+                {isAdmin && (
+                    <Link to="/admin/analytics">
+                        Business Analytics
+                    </Link>
+                )}
+
+                {isDeliveryPerson && (
+                    <Link to="/delivery/share">
+                        Share Delivery Location
+                    </Link>
+                )}
+
+                {isAdmin && (
+                    <Link to="/admin/delivery-tracking">
+                        Delivery Tracking
                     </Link>
                 )}
 
@@ -223,6 +265,9 @@ function Navbar({ darkMode, setDarkMode }) {
 // =====================================
 
 function App() {
+
+    const location = useLocation();
+    const isAnalyticsPage = location.pathname === "/admin/analytics";
 
     // =====================================
     // DARK MODE STATE
@@ -303,13 +348,17 @@ function App() {
             {/* NAVBAR */}
             {/* ================================= */}
 
-            <Navbar
-                darkMode={darkMode}
-                setDarkMode={setDarkMode}
-            />
-            <Link to="/wishlist">
-              ❤️ Wishlist
-             </Link>
+            {!isAnalyticsPage && (
+                <>
+                    <Navbar
+                        darkMode={darkMode}
+                        setDarkMode={setDarkMode}
+                    />
+                    <Link to="/wishlist">
+                        ❤️ Wishlist
+                    </Link>
+                </>
+            )}
 
 
             {/* ================================= */}
@@ -408,6 +457,11 @@ function App() {
                         element={<Orders />}
                     />
 
+                    <Route
+                        path="/insights"
+                        element={<CustomerInsights />}
+                    />
+
 
                     <Route
                         path="/orders/:id"
@@ -422,6 +476,11 @@ function App() {
                     <Route
                         path="/payments"
                         element={<PaymentHistory />}
+                    />
+
+                    <Route
+                        path="/delivery/share"
+                        element={<DeliveryPersonTracking />}
                     />
 
 
@@ -447,6 +506,14 @@ function App() {
                             element={
                                 <AdminDashboard />
                             }
+                        />
+                        <Route
+                            path="/admin/analytics"
+                            element={<BusinessAnalytics />}
+                        />
+                        <Route
+                            path="/admin/delivery-tracking"
+                            element={<AdminDeliveryTracking />}
                         />
                         <Route
                         path="/admin/products"

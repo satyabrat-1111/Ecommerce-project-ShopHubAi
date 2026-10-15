@@ -30,6 +30,7 @@ from rest_framework_simplejwt.views import (
 from accounts.views import (
     CustomTokenObtainPairView,
 )
+from orders.admin_views import BusinessAnalyticsOverviewView
 
 from drf_spectacular.views import (
     SpectacularAPIView,
@@ -38,6 +39,17 @@ from drf_spectacular.views import (
 
 
 urlpatterns = [
+
+    path(
+        "api/analytics/overview/",
+        BusinessAnalyticsOverviewView.as_view(),
+        name="business-analytics-overview",
+    ),
+
+    path(
+        "api/delivery-tracking/",
+        include("orders.tracking_urls"),
+    ),
 
     # =========================================
     # DJANGO ADMIN

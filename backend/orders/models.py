@@ -112,6 +112,30 @@ class OrderItem(models.Model):
         return self.price * self.quantity
 
 
+class DeliveryTracking(models.Model):
+    order = models.OneToOneField(
+        Order,
+        on_delete=models.CASCADE,
+        related_name="delivery_tracking",
+    )
+    delivery_person = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="assigned_deliveries",
+        null=True,
+        blank=True,
+    )
+    latitude = models.FloatField(null=True, blank=True)
+    longitude = models.FloatField(null=True, blank=True)
+    accuracy_meters = models.FloatField(null=True, blank=True)
+    is_sharing = models.BooleanField(default=False)
+    last_location_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Tracking for order #{self.order_id}"
+
+
 class DeliveryIssueClaim(models.Model):
 
     ISSUE_TYPES = [

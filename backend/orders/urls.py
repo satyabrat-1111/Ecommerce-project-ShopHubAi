@@ -14,6 +14,7 @@ from .views import (
     AdminDeliveryIssueClaimsView,
     AdminDeliveryIssueReviewView,
 )
+from .customer_views import CustomerInsightsView
 
 
 urlpatterns = [
@@ -32,6 +33,12 @@ urlpatterns = [
         "history/",
         OrderHistoryView.as_view(),
         name="order-history",
+    ),
+
+    path(
+        "insights/",
+        CustomerInsightsView.as_view(),
+        name="customer-insights",
     ),
 
     path(

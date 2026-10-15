@@ -11,7 +11,12 @@ class CustomUserAdmin(UserAdmin):
         "phone",
         "is_verified",
         "is_staff",
+        "is_delivery_person",
         "is_active",
+    )
+
+    fieldsets = UserAdmin.fieldsets + (
+        ("Delivery access", {"fields": ("is_delivery_person",)}),
     )
 
     search_fields = (
@@ -23,5 +28,6 @@ class CustomUserAdmin(UserAdmin):
     list_filter = (
         "is_verified",
         "is_staff",
+        "is_delivery_person",
         "is_active",
     )

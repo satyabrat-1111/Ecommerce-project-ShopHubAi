@@ -1,9 +1,18 @@
 const API_BASE_URL = "http://localhost:8000/api";
 
+const clearAuthState = () => {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+    localStorage.removeItem("is_admin");
+    localStorage.removeItem("is_delivery_person");
+    window.dispatchEvent(new Event("auth-updated"));
+};
+
 const fetchWithOtpAuth = async (url, options) => {
     const accessToken = localStorage.getItem("access_token");
 
     if (!accessToken) {
+        clearAuthState();
         throw new Error("Please login as admin.");
     }
 
@@ -25,6 +34,7 @@ const fetchWithOtpAuth = async (url, options) => {
     const refreshToken = localStorage.getItem("refresh_token");
 
     if (!refreshToken) {
+        clearAuthState();
         throw new Error("Your session expired. Please login again.");
     }
 
@@ -44,6 +54,7 @@ const fetchWithOtpAuth = async (url, options) => {
     const refreshData = await refreshResponse.json();
 
     if (!refreshResponse.ok || !refreshData.access) {
+        clearAuthState();
         throw new Error(
             refreshData.detail ||
                 "Your session expired. Please login again."

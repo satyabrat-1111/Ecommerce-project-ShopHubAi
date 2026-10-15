@@ -152,6 +152,12 @@ function Login() {
                     : "false"
             );
 
+            localStorage.setItem(
+                "is_delivery_person",
+                payload.is_delivery_person === true ? "true" : "false"
+            );
+            window.dispatchEvent(new Event("auth-updated"));
+
 
             console.log(
                 "Access Token Saved Successfully"

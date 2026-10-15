@@ -50,6 +50,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         # User information inside JWT
         token["username"] = user.username
         token["is_admin"] = user.is_staff
+        token["is_delivery_person"] = user.is_delivery_person
 
         return token
 

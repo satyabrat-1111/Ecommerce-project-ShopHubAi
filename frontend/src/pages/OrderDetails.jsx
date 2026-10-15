@@ -7,6 +7,7 @@ downloadInvoice,
 getDeliveryIssueClaims,
 createDeliveryIssueClaim,
 } from "../services/orderApi";
+import CustomerLiveTracking from "./CustomerLiveTracking";
 
 function OrderDetails() {
 
@@ -454,6 +455,10 @@ return (
                     {invoiceMessage}
                 </div>
 
+            )}
+
+            {orderStatus === "Shipped" && (
+                <CustomerLiveTracking orderId={id} />
             )}
 
 

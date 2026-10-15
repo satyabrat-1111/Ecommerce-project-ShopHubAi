@@ -645,6 +645,18 @@ export const getHomeRecommendations = async () => {
             localStorage.removeItem(
                 "access_token"
             );
+            localStorage.removeItem(
+                "refresh_token"
+            );
+            localStorage.removeItem(
+                "is_admin"
+            );
+            localStorage.removeItem(
+                "is_delivery_person"
+            );
+            window.dispatchEvent(
+                new Event("auth-updated")
+            );
 
             return null;
 

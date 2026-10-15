@@ -1,5 +1,5 @@
 import tempfile
-from datetime import timedelta
+from datetime import datetime, timedelta
 from io import BytesIO
 from unittest.mock import patch
 
@@ -13,8 +13,11 @@ from requests.exceptions import ConnectionError
 from twilio.base.exceptions import TwilioException
 
 from accounts.models import User
+from cart.models import Cart, CartItem
 from categories.models import Category
 from products.models import Product
+from payments.models import Payment
+from wishlist.models import Wishlist, WishlistItem
 from .models import DeliveryIssueClaim, Order, OrderItem
 from .twilio_service import (
 	DeliveryOTPError,
@@ -232,3 +235,207 @@ class DeliveryIssueClaimAPITests(APITestCase):
 		self.assertEqual(claim.refund_processing_date, refund_date)
 		self.assertIn(refund_date.strftime("%B %d, %Y"), claim.customer_message)
 		send_email.assert_called_once()
+
+
+class BusinessAnalyticsAPITests(APITestCase):
+
+	def setUp(self):
+		self.customer = User.objects.create_user(
+			username="analytics-customer",
+			email="analytics@example.com",
+			password="test-password",
+		)
+		self.admin = User.objects.create_user(
+			username="analytics-admin",
+			password="test-password",
+			is_staff=True,
+		)
+		self.category = Category.objects.create(
+			name="Analytics Test",
+			slug="analytics-test",
+		)
+		self.product = Product.objects.create(
+			category=self.category,
+			name="Analytics product",
+			slug="analytics-product",
+			brand="Test brand",
+			description="Product used for analytics tests.",
+			price="20.00",
+			discount_price="15.00",
+			stock=3,
+			sku="ANALYTICS-001",
+		)
+		self.order = Order.objects.create(
+			user=self.customer,
+			total_amount="30.00",
+			shipping_address="1 Test Street",
+			city="Test City",
+			state="Test State",
+			pincode="123456",
+			status="Delivered",
+		)
+		self.order_day = timezone.localdate() - timedelta(days=1)
+		order_timestamp = timezone.make_aware(
+			datetime.combine(self.order_day, datetime.min.time())
+		)
+		Order.objects.filter(pk=self.order.pk).update(created_at=order_timestamp)
+		User.objects.filter(pk=self.customer.pk).update(date_joined=order_timestamp)
+		OrderItem.objects.create(
+			order=self.order,
+			product=self.product,
+			quantity=2,
+			price="15.00",
+		)
+		Payment.objects.create(
+			user=self.customer,
+			order=self.order,
+			amount="30.00",
+			payment_status="Success",
+		)
+
+	def _get_report(self, **params):
+		self.client.force_authenticate(user=self.admin)
+		return self.client.get(
+			reverse("business-analytics-overview"),
+			params,
+		)
+
+	def test_business_metrics_require_staff_access(self):
+		response = self.client.get(reverse("business-analytics-overview"))
+		self.assertEqual(response.status_code, 401)
+
+		self.client.force_authenticate(user=self.customer)
+		response = self.client.get(reverse("business-analytics-overview"))
+		self.assertEqual(response.status_code, 403)
+
+	def test_report_filters_period_and_counts_only_successful_sales(self):
+		response = self._get_report(
+			start=self.order_day.isoformat(),
+			end=self.order_day.isoformat(),
+			granularity="daily",
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(response.data["kpis"]["successful_sales"], "30.00")
+		self.assertEqual(response.data["kpis"]["successful_payments"], 1)
+		self.assertEqual(response.data["kpis"]["orders"], 1)
+		self.assertEqual(response.data["kpis"]["delivered_orders"], 1)
+		self.assertEqual(response.data["top_products"][0]["quantity"], 2)
+		self.assertEqual(response.data["top_products"][0]["revenue"], "30.00")
+		self.assertEqual(len(response.data["sales_trend"]), 1)
+		self.assertEqual(response.data["customer_trend"][0]["new_customers"], 1)
+
+	def test_report_rejects_invalid_and_excessive_ranges(self):
+		invalid_date = self._get_report(start="not-a-date")
+		self.assertEqual(invalid_date.status_code, 400)
+
+		too_long = self._get_report(
+			start="2024-01-01",
+			end="2025-01-02",
+		)
+		self.assertEqual(too_long.status_code, 400)
+
+
+class CustomerInsightsAPITests(APITestCase):
+	def setUp(self):
+		self.customer = User.objects.create_user(
+			username="insights-customer",
+			password="test-password",
+		)
+		self.other_customer = User.objects.create_user(
+			username="other-insights-customer",
+			password="test-password",
+		)
+		category = Category.objects.create(
+			name="Customer Insights",
+			slug="customer-insights",
+		)
+		product = Product.objects.create(
+			category=category,
+			name="Insights product",
+			slug="insights-product",
+			brand="Test brand",
+			description="Product used for customer insights tests.",
+			price="25.00",
+			sku="INSIGHTS-001",
+		)
+		self.order = Order.objects.create(
+			user=self.customer,
+			total_amount="25.00",
+			shipping_address="Private customer address",
+			city="Test City",
+			state="Test State",
+			pincode="123456",
+			status="Delivered",
+		)
+		OrderItem.objects.create(
+			order=self.order,
+			product=product,
+			quantity=1,
+			price="25.00",
+		)
+		Payment.objects.create(
+			user=self.customer,
+			order=self.order,
+			amount="25.00",
+			payment_status="Success",
+		)
+		pending_order = Order.objects.create(
+			user=self.customer,
+			total_amount="50.00",
+			shipping_address="Private customer address",
+			city="Test City",
+			state="Test State",
+			pincode="123456",
+		)
+		Payment.objects.create(
+			user=self.customer,
+			order=pending_order,
+			amount="50.00",
+			payment_status="Pending",
+		)
+		other_order = Order.objects.create(
+			user=self.other_customer,
+			total_amount="900.00",
+			shipping_address="Other customer's private address",
+			city="Other City",
+			state="Other State",
+			pincode="654321",
+		)
+		Payment.objects.create(
+			user=self.other_customer,
+			order=other_order,
+			amount="900.00",
+			payment_status="Success",
+		)
+		cart = Cart.objects.create(user=self.customer)
+		CartItem.objects.create(cart=cart, product=product, quantity=2)
+		wishlist = Wishlist.objects.create(user=self.customer)
+		WishlistItem.objects.create(wishlist=wishlist, product=product)
+
+	def test_customer_insights_require_authentication(self):
+		response = self.client.get(reverse("customer-insights"))
+		self.assertEqual(response.status_code, 401)
+
+	def test_insights_only_include_authenticated_users_data(self):
+		self.client.force_authenticate(user=self.customer)
+		response = self.client.get(
+			reverse("customer-insights"),
+			{"user_id": self.other_customer.id},
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(response.data["summary"]["orders"], 2)
+		self.assertEqual(response.data["summary"]["delivered_orders"], 1)
+		self.assertEqual(response.data["summary"]["successful_spend"], "25.00")
+		self.assertEqual(response.data["summary"]["successful_payments"], 1)
+		self.assertEqual(response.data["summary"]["cart_products"], 1)
+		self.assertEqual(response.data["summary"]["cart_units"], 2)
+		self.assertEqual(response.data["summary"]["wishlist_products"], 1)
+		self.assertEqual(len(response.data["recent_orders"]), 2)
+		self.assertTrue(all(
+			order["id"] != Order.objects.filter(user=self.other_customer).first().id
+			for order in response.data["recent_orders"]
+		))
+		self.assertNotIn("shipping_address", response.data["recent_orders"][0])
+		self.assertEqual(len(response.data["spending_trend"]), 6)
